@@ -36,5 +36,4 @@ Next steps:
 
 linux:
 gcc -o main.o -lX11 -lm -O3 -march=native ./linux2.c
-windows (behind schedule):
-compile with gcc -o main.exe -lgdi32 -mwindows -g .\main-windows.c
+gcc -o main.exe -lgdi32 -mwindows -O3 -march=native .\main-windows.c
