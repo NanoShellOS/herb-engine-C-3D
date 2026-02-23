@@ -7,6 +7,13 @@
 #include <assert.h>
 #include <time.h>
 
+//TODO: make cube struct, with 6 faces (each face is a struct with an r (dist to camera), and the squares, and a neighbours value)
+// for each cube, only render the 3 faces with the smallest rs
+// each face has a value that states if it's neighbour is occupied,
+// if it is, don't render it
+
+// qsort sorts faces by r, not squares
+
 //TODO: other blocks and terrain generation
 
 //TODO: make movement and gravity velocity based

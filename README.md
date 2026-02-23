@@ -24,17 +24,14 @@ Work done so far:
  - a texture map, which takes each square, and colours it pixel by pixel from a given texture
  - sort each square by their distance to the camera
  - simple cubicy collisions
+ - simple hotbar
 
 Next steps:
+ - group cubes by faces, then don't draw the back 3 faces, or any faces with a neighbour
  - velocity based movement
  - terrain generation - not sure how to do this yet
- - hotbar / other blocks we can build with
  - chunks?
  - make it platform generic
-
-Future ideas:
- - I have no idea how to not draw something that is behind something else...
-
 
 linux:
 gcc -o main.o -lX11 -lm -O3 -march=native ./linux2.c
