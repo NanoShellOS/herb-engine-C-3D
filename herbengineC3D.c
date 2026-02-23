@@ -31,8 +31,8 @@
 
 /* ----------------------- defines --------------------- */
 
-#define WIDTH  3500
-#define HEIGHT 1500
+#define WIDTH  1500
+#define HEIGHT 800
 
 #define FOV 2
 
