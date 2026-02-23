@@ -34,6 +34,7 @@ Next steps:
  - chunks?
  - make it platform generic
 
-linux:
-gcc -o main.o -lX11 -lm -O3 -march=native ./linux2.c
-gcc -o main.exe -lgdi32 -mwindows -O3 -march=native .\main-windows.c
+linux:  
+gcc -o main.o -lX11 -lm -O3 -march=native ./linux2.c  
+Windows:  
+gcc -o main.exe -lgdi32 -mwindows -O3 -march=native .\main-windows.c  
