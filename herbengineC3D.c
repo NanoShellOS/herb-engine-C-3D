@@ -66,10 +66,14 @@ typedef struct {
 	uint32_t colour;
 } square_t;
 
+typedef enum {
+	TOP = 0, FRONT, LEFT, BACK, RIGHT, BOTTOM
+} direction_t;
+
 typedef struct {
 	square_t squares[SQUARES_PER_FACE];
 	int r; // distance from camera
-	int dir; // top bottom left right etc
+	int dir; // top front left etc
 } face_t;
 
 typedef struct {
@@ -545,24 +549,23 @@ void add_cube_to_cubes_array(vec3_t top_left, texture_t *texture, cubes_t *array
 		}
 	}
 
-    // TODO: create enum for this
 	cube.faces[0] = top;
-	cube.faces[0].dir = 0;
+	cube.faces[0].dir = TOP;
 
 	cube.faces[1] = front;
-	cube.faces[1].dir = 1;
+	cube.faces[1].dir = FRONT;
 
 	cube.faces[2] = left;
-	cube.faces[2].dir = 2;
+	cube.faces[2].dir = LEFT;
 
 	cube.faces[3] = back;
-	cube.faces[3].dir = 3;
+	cube.faces[3].dir = BACK;
 
 	cube.faces[4] = right;
-	cube.faces[4].dir = 4;
+	cube.faces[4].dir = RIGHT;
 
 	cube.faces[5] = bottom;
-	cube.faces[5].dir = 5;
+	cube.faces[5].dir = BOTTOM;
 
 	array->items[array->count++] = cube;
 
@@ -589,12 +592,13 @@ void render_cubes() {
 
 	// for each cube
 	for (int i = 0; i < world_cubes.count; i++) {
+		cube_t cube = world_cubes.items[i];
 
 		// for each face of the cube
 		for (int j = 0; j < 6; j++) {
 
 			// find the 3 faces closest to the camera
-			face_t face = world_cubes.items[i].faces[j];
+			face_t face = cube.faces[j];
 
 			// top left coord
 			int x1 = face.squares[0].coords[0].x - camera_pos.x;
@@ -612,17 +616,17 @@ void render_cubes() {
 
 			// calc distance to camera
 			int r = sqrt((x1 * x1) + (y1 * y1) + (z1 * z1));
-			world_cubes.items[i].faces[j].r = r;
+			cube.faces[j].r = r;
 	    }
 
 		// sort the faces based on their distance to the camera
-		qsort(&world_cubes.items[i].faces, 6, sizeof(face_t), compare_faces_reverse);
+		qsort(&cube.faces, 6, sizeof(face_t), compare_faces_reverse);
 
 		for (int j = 0; j < 3; j++) {
 
 			int pos_highlight = 0;
 
-			face_t face = world_cubes.items[i].faces[j];
+			face_t face = cube.faces[j];
 			face_t new_face = {0};
 			new_face.r = face.r;
 			new_face.dir = face.dir;
@@ -688,13 +692,7 @@ void render_cubes() {
 					central_cube_index = i;
 					// find the face we have highlighted
 					cube_highlighted = new_face.dir;
-					// 0 = top
-					// 1 = front
-					// 2 = left
-					// 3 = back
-					// 4 = right
-					// 5 = bottom
-					draw_highlight_index = j;
+					draw_highlight_index = draw_faces.count;
 				}
 			}
 					
