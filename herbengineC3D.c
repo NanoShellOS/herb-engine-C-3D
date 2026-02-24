@@ -70,6 +70,7 @@ typedef struct {
 	int r; // distance from camera
 	int dir; // top front left etc
 	int neighbour;
+	int back_face;
 } face_t;
 
 typedef struct {
@@ -349,15 +350,15 @@ void init_stuff() {
 
 	// setup the world:
 	colour_t c = blue;
-	for (int i = -5; i < 50; i++) {
-		for (int j = 0; j < 50; j++) {
+	for (int i = -5; i < 20; i++) {
+		for (int j = 0; j < 20; j++) {
 			add_cube_to_cubes_array((vec3_t){50 + (i * CUBE_WIDTH), 50, 10 + (j * CUBE_WIDTH)}, grass_texture, &world_cubes);
 		}
 	}
 
 	for (int k = 1; k < 20; k++) {
-		for (int i = -5; i < 50; i++) {
-			for (int j = 0; j < 50; j++) {
+		for (int i = -5; i < 20; i++) {
+			for (int j = 0; j < 20; j++) {
 				add_cube_to_cubes_array((vec3_t){50 + (i * CUBE_WIDTH), 50 - (k * CUBE_WIDTH), 10 + (j * CUBE_WIDTH)}, stone_texture, &world_cubes);
 			}
 		}
@@ -635,23 +636,64 @@ void render_cubes() {
 
 	// for each cube
 	for (int i = 0; i < world_cubes.count; i++) {
-		cube_t cube = world_cubes.items[i];
 
-		// for each face of the cube
+		// only draw faces closest to camera
+
+		// top left coord
+		int x1 = world_cubes.items[i].faces[0].squares[0].coords[0].x - camera_pos.x;
+		int y1 = world_cubes.items[i].faces[0].squares[0].coords[0].y - camera_pos.y;
+		int z1 = world_cubes.items[i].faces[0].squares[0].coords[0].z - camera_pos.z;
+
+		// TODO: account for camera width and height of player
+
+		if (abs(camera_pos.x - x1 + CUBE_WIDTH) < abs(camera_pos.x - x1)) {
+			// draw right side
+			world_cubes.items[i].faces[RIGHT].back_face = 0;
+			world_cubes.items[i].faces[LEFT].back_face = 1;
+		}
+		else {
+			// draw left side
+			world_cubes.items[i].faces[LEFT].back_face = 0;
+			world_cubes.items[i].faces[RIGHT].back_face = 1;
+		}
+		if (abs(camera_pos.z - z1 + CUBE_WIDTH) < abs(camera_pos.z - z1)) {
+			// draw back side
+			world_cubes.items[i].faces[BACK].back_face = 0;
+			world_cubes.items[i].faces[FRONT].back_face = 1;
+		}
+		else {
+			// draw front side
+			world_cubes.items[i].faces[FRONT].back_face = 0;
+			world_cubes.items[i].faces[BACK].back_face = 1;
+		}
+		if (abs(camera_pos.y - y1 - CUBE_WIDTH) < abs(camera_pos.y - y1)) {
+			// draw bottom side
+			world_cubes.items[i].faces[BOTTOM].back_face = 0;
+			world_cubes.items[i].faces[TOP].back_face = 1;
+		}
+		else {
+			// draw top side
+			world_cubes.items[i].faces[TOP].back_face = 0;
+			world_cubes.items[i].faces[BOTTOM].back_face = 1;
+		}
+
 		for (int j = 0; j < 6; j++) {
 
-			// find the 3 faces closest to the camera
-			face_t face = world_cubes.items[i].faces[j];
+			if (world_cubes.items[i].faces[j].neighbour || (! world_cubes.items[i].faces[j].back_face)) {
+				continue;
+			}
+
+			int pos_highlight = 0;
 
 			// top left coord
-			int x1 = face.squares[0].coords[0].x - camera_pos.x;
-			int y1 = face.squares[0].coords[0].y - camera_pos.y;
-			int z1 = face.squares[0].coords[0].z - camera_pos.z;
+			int x1 = world_cubes.items[i].faces[j].squares[0].coords[0].x - camera_pos.x;
+			int y1 = world_cubes.items[i].faces[j].squares[0].coords[0].y - camera_pos.y;
+			int z1 = world_cubes.items[i].faces[j].squares[0].coords[0].z - camera_pos.z;
 
 			// bottom right coord
-			x1 += face.squares[SQUARES_PER_FACE - 1].coords[0].x - camera_pos.x;
-			y1 += face.squares[SQUARES_PER_FACE - 1].coords[0].y - camera_pos.y;
-			z1 += face.squares[SQUARES_PER_FACE - 1].coords[0].z - camera_pos.z;
+			x1 += world_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].x - camera_pos.x;
+			y1 += world_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].y - camera_pos.y;
+			z1 += world_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].z - camera_pos.z;
 
 			x1 /= 2;
 			y1 /= 2;
@@ -659,25 +701,10 @@ void render_cubes() {
 
 			// calc distance to camera
 			int r = sqrt((x1 * x1) + (y1 * y1) + (z1 * z1));
-			world_cubes.items[i].faces[j].r = r;
-	    }
-
-		// sort the faces based on their distance to the camera
-		qsort(&cube.faces, 6, sizeof(face_t), compare_faces_reverse);
-
-		for (int j = 0; j < 3; j++) {
-
-			int pos_highlight = 0;
-
-			face_t face = cube.faces[j];
-
-			if (face.neighbour) {
-				continue;
-			}
 
 			face_t new_face = {0};
-			new_face.r = face.r;
-			new_face.dir = face.dir;
+			new_face.r = r;
+			new_face.dir = world_cubes.items[i].faces[j].dir;
 
 			// for each square of each face of the cube
 			for (int k = 0; k < SQUARES_PER_FACE; k++) {
@@ -685,9 +712,9 @@ void render_cubes() {
 			    square_t new_square = {0};
 				for (int l = 0; l < 4; l++) {
 					vec3_t pos = {0};
-					pos.x = face.squares[k].coords[l].x;
-					pos.y = face.squares[k].coords[l].y;
-					pos.z = face.squares[k].coords[l].z;
+					pos.x = world_cubes.items[i].faces[j].squares[k].coords[l].x;
+					pos.y = world_cubes.items[i].faces[j].squares[k].coords[l].y;
+					pos.z = world_cubes.items[i].faces[j].squares[k].coords[l].z;
 					pos.x -= camera_pos.x;
 					pos.y -= camera_pos.y;
 					pos.z -= camera_pos.z;
@@ -698,7 +725,7 @@ void render_cubes() {
 					new_square.coords[l].x = new_pos.x;
 					new_square.coords[l].y = new_pos.y;
 					new_square.coords[l].z = new_pos.z;
-					new_square.colour = face.squares[k].colour;
+					new_square.colour = world_cubes.items[i].faces[j].squares[k].colour;
 				}
 
 				new_face.squares[k] = new_square;
