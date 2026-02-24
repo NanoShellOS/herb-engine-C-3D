@@ -7,7 +7,8 @@
 #include <assert.h>
 #include <time.h>
 
-//TODO: fix back face culling and neighbour culling
+//TODO: fix neighbour culling strange issues...
+//TODO: add back face culling if needed... (try decreasing resolution first)
 
 //TODO: other blocks and terrain generation
 
@@ -625,13 +626,12 @@ void render_cubes() {
 
 	// for each cube
 	for (int i = 0; i < world_cubes.count; i++) {
-		cube_t cube = world_cubes.items[i];
 
 		// for each face of the cube
 		for (int j = 0; j < 6; j++) {
 
 			// find the 3 faces closest to the camera
-			face_t face = cube.faces[j];
+			face_t face = world_cubes.items[i].faces[j];
 
 			// top left coord
 			int x1 = face.squares[0].coords[0].x - camera_pos.x;
@@ -649,17 +649,18 @@ void render_cubes() {
 
 			// calc distance to camera
 			int r = sqrt((x1 * x1) + (y1 * y1) + (z1 * z1));
-			cube.faces[j].r = r;
+			world_cubes.items[i].faces[j].r = r;
 	    }
 
+		// TODO: add back face culling if needed, for some reason this didnt work, and it made it slower!
 		// sort the faces based on their distance to the camera
-		// qsort(&cube.faces, 6, sizeof(face_t), compare_faces_reverse);
+		// qsort(&world_cubes.items[i].faces, 6, sizeof(face_t), compare_faces_reverse);
 
 		for (int j = 0; j < 6; j++) {
 
 			int pos_highlight = 0;
 
-			face_t face = cube.faces[j];
+			face_t face = world_cubes.items[i].faces[j];
 
 			if (face.neighbour) {
 				continue;
