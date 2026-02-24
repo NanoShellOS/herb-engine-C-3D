@@ -30,11 +30,8 @@ Work done so far:
  - don't draw back faces, or faces with a neighbouring face
 
 Next steps:
- - lower the resolution
- - velocity based movement
  - terrain generation - not sure how to do this yet
  - chunks?
- - make it platform generic
 
 linux:  
 gcc -o main.o -lX11 -lm -O3 -march=native ./linux2.c  
