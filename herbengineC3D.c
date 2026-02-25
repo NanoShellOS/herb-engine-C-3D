@@ -9,8 +9,8 @@
 
 
 // new features:
-// chunks
-// terrain
+// chunks - make it infinite
+// simple terration - trees and hills
 
 // big fixes:
 // TODO: fix fill squares to accomodate for when the ys of the square are too close
@@ -18,13 +18,12 @@
     // this is taking a million years to load the world cos of this
 
 // small fixes:
-// TODO: fix collisions - you can jump and see into a cube
 //TODO: only dont draw a square if ALL zs are negative
-//TODO: make jumping only possible when on ground
 // TODO: clean hotbar UI
 
 // optimisations:
 //TODO: optimise by lowering resolution somehow?
+//     - could maybe do this in the fill square function!
 
 /* ----------------------- defines --------------------- */
 
@@ -666,8 +665,6 @@ void render_cubes() {
 		int y2 = y1 - CUBE_WIDTH;
 		int z2 = z1 + CUBE_WIDTH;
 
-		// TODO: account for camera width and height of player
-
 		if (abs(camera_pos.x - x2) < abs(camera_pos.x - x1)) {
 			// draw right side
 			world_cubes.items[i].faces[RIGHT].back_face = 0;
@@ -1060,7 +1057,6 @@ void fill_square(square_t *square) {
 				if (x2 > WIDTH) {
 					x2 = WIDTH;
 				}
-				// TODO: might need to add check here if x1 < x2
 				for (int x = x1; x < x2; x++) {
 					row[x] = square->colour;
 				}
@@ -1072,7 +1068,6 @@ void fill_square(square_t *square) {
 				if (x1 > WIDTH) {
 					x1 = WIDTH;
 				}
-				// TODO: might need to add check here if x2 < x1
 				for (int x = x2; x < x1; x++) {
 					row[x] = square->colour;
 				}
@@ -1102,7 +1097,6 @@ void fill_square(square_t *square) {
 				if (x2 > WIDTH) {
 					x2 = WIDTH;
 				}
-				// TODO: might need to add check here if x1 < x2
 				for (int x = x1; x < x2; x++) {
 					row[x] = square->colour;
 				}
@@ -1114,7 +1108,6 @@ void fill_square(square_t *square) {
 				if (x1 > WIDTH) {
 					x1 = WIDTH;
 				}
-				// TODO: might need to add check here if x2 < x1
 				for (int x = x2; x < x1; x++) {
 					row[x] = square->colour;
 				}
@@ -1149,7 +1142,6 @@ void fill_square(square_t *square) {
 			if (right_x > WIDTH) {
 				right_x = WIDTH;
 			}
-			// TODO: might need to recheck if left_x < right_x in case where left_x was already larger than width...
 			for (int x = left_x; x < right_x; x++) {
 				row[x] = square->colour;
 			}
@@ -1161,7 +1153,6 @@ void fill_square(square_t *square) {
 			if (left_x > WIDTH) {
 				left_x = WIDTH;
 			}
-			// TODO: might need to recheck if right_x < left_x
 			for (int x = right_x; x < left_x; x++) {
 				row[x] = square->colour;
 			}
