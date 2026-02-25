@@ -8,7 +8,6 @@
 #include <time.h>
 
 //TODO:
-// new features:
 // chunks - make it infinite
 // simple terration - trees and hills
 
@@ -300,7 +299,8 @@ void init_stuff() {
 	// hand
 	hand_cubes.items = malloc(sizeof(cube_t));
 	hand_faces.items = malloc(6 * sizeof(face_t));
-	add_cube_to_cubes_array((vec3_t){2 * CUBE_WIDTH, 2 * CUBE_WIDTH, 2 * CUBE_WIDTH}, grass_texture, &hand_cubes);
+	vec3_t pos = {camera_pos.x + 2 * CUBE_WIDTH, camera_pos.y - 0.5 * CUBE_WIDTH, camera_pos.z + 0.5 * CUBE_WIDTH};
+	add_cube_to_cubes_array(pos, grass_texture, &hand_cubes);
 	render_hand();
 
 	// setup the world:
@@ -1301,7 +1301,6 @@ void handle_input()
 		hand_cubes.count = 0;
 		add_cube_to_cubes_array(pos, grass_texture, &hand_cubes);
 		render_hand();
-		render_hotbar();
 	}
 	if (keys[two]) {
 		hotbar_selection = 1;
@@ -1498,14 +1497,14 @@ void render_hotbar() {
 		for (int j = 0; j < 6; j++) {
 
 			// top left coord
-			int x1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].x - camera_pos.x;
-			int y1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].y - camera_pos.y;
-			int z1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].z - camera_pos.z;
+			int x1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].x;
+			int y1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].y;
+			int z1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].z;
 
 			// bottom right coord
-			x1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].x - camera_pos.x;
-			y1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].y - camera_pos.y;
-			z1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].z - camera_pos.z;
+			x1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].x;
+			y1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].y;
+			z1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].z;
 
 			x1 /= 2;
 			y1 /= 2;
@@ -1533,8 +1532,8 @@ void render_hotbar() {
 					vec3_t new_pos = {0};
 					rotate_and_project_by_rot_value(&pos, &new_pos, 0, 0);
 
-					new_square.coords[l].x = new_pos.x - (WIDTH / 2) + (i * HOTBAR_SLOT_WIDTH);
-					new_square.coords[l].y = new_pos.y;
+					new_square.coords[l].x = new_pos.x - (WIDTH / 2) + ((i + 1.2) * HOTBAR_SLOT_WIDTH);
+					new_square.coords[l].y = new_pos.y + (HEIGHT / 2) - (HEIGHT - hotbar_y) - HOTBAR_SLOT_WIDTH;
 					new_square.coords[l].z = new_pos.z;
 					new_square.colour = hotbar_cubes.items[i].faces[j].squares[k].colour;
 				}
