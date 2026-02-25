@@ -9,6 +9,9 @@
 
 //TODO:
 // chunks - make it infinite
+    // store world in chunks
+	// when we go past a chunk border, remove old chunks, then add new chunks
+
 // simple terration - trees and hills
 
 // big fixes:
@@ -167,6 +170,7 @@ static int collided();
 
 static uint32_t *pixels = NULL;
 
+static chunks_t chunks = {0};
 static cubes_t world_cubes = {0};
 static faces_t draw_faces = {0};
 static int central_cube_index;
