@@ -11,6 +11,9 @@
 // chunks - make it infinite
     // store world in chunks
 	// when we go past a chunk border, remove old chunks, then add new chunks
+	// if we place or remove a block, store the location and block type in the chunk data, and save
+    // the chunk data.
+    // when we load a chunk, check if that chunk is stored in chunk data, else just generate it normally
 
 // simple terration - trees and hills
 // simple lighting
@@ -42,7 +45,7 @@
 #define TARGET_FPS 60
 #define FRAME_TIME_NS (1000000000 / TARGET_FPS)
 
-#define CHUNK_WIDTH 20
+#define CHUNK_WIDTH 10
 
 #define HOTBAR_SLOTS 9
 #define HOTBAR_SLOT_WIDTH (WIDTH / (HOTBAR_SLOTS + 2)) // add 2 so it's centred
@@ -299,19 +302,19 @@ void init_stuff() {
 	render_hand();
 
 	// setup the world:
-	for (int i = -5; i < 20; i++) {
-		for (int j = 0; j < 20; j++) {
+	for (int i = -5; i < 60; i++) {
+		for (int j = 0; j < 60; j++) {
 			add_cube_to_cubes_array((vec3_t){(i * CUBE_WIDTH), 0, (j * CUBE_WIDTH)}, grass_texture, &world_cubes);
 		}
 	}
 
-	for (int k = 1; k < 20; k++) {
-		for (int i = -5; i < 20; i++) {
-			for (int j = 0; j < 20; j++) {
-				add_cube_to_cubes_array((vec3_t){(i * CUBE_WIDTH), -(k * CUBE_WIDTH), (j * CUBE_WIDTH)}, stone_texture, &world_cubes);
-			}
-		}
-	}
+	//for (int k = 1; k < 20; k++) {
+		//for (int i = -5; i < 20; i++) {
+			//for (int j = 0; j < 20; j++) {
+				//add_cube_to_cubes_array((vec3_t){(i * CUBE_WIDTH), -(k * CUBE_WIDTH), (j * CUBE_WIDTH)}, stone_texture, &world_cubes);
+			//}
+		//}
+	//}
 
 	// tree
 	add_cube_to_cubes_array((vec3_t){3 * CUBE_WIDTH, 1 * CUBE_WIDTH, 3 * CUBE_WIDTH}, wood_texture, &world_cubes);
@@ -1286,9 +1289,23 @@ void handle_input()
 	// make the player 2 cubes tall:
 	camera_pos.y -= CUBE_WIDTH;
 
+	// TODO: could compute 1 / cube width and 1 / chunk width to speed this up
+	int old = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
+	int new = old;
     camera_pos.x += x;
 	if (collided()) {
 		camera_pos.x -= x;
+	}
+	else {
+		new = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
+		if (old != new) {
+			if (camera_pos.x < camera_pos.x - x) {
+				printf("\n CROSSED X BOUNDARY FORWARD!");
+			}
+			else {
+				printf("\n CROSSED X BOUNDARY BACKWARD!");
+			}
+		}
 	}
 
     camera_pos.y += y;
@@ -1296,9 +1313,22 @@ void handle_input()
 		camera_pos.y -= y;
 	}
 
+	old = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
+	new = old;
     camera_pos.z += z;
 	if (collided()) {
 		camera_pos.z -= z;
+	}
+	else {
+		new = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
+		if (old != new) {
+			if (camera_pos.z < camera_pos.z - z) {
+				printf("\n CROSSED Z BOUNDARY FORWARD!");
+			}
+			else {
+				printf("\n CROSSED Z BOUNDARY BACKWARD!");
+			}
+		}
 	}
 	
 	camera_pos.y += CUBE_WIDTH;
