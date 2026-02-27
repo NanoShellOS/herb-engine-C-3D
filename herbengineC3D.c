@@ -9,16 +9,15 @@
 
 //TODO:
 
+// fix hotbar and hand UI
+
+// fix updating occupied_chunk_index
+
 // add fog at chunk boundaries
 
-// place_cube is no longer checking neighbours
+// fix place and remove cube to also check neighbouring chunks if at a chunk boundary
 
-// fix remove cube - need to check if cube was on the boundary of a chunk for neighbours!
-// improve detecting if we crossed a chunk boundary
-// detecting if we crossed a chunk boundary doesn't work at 0, 0, 0 area
-
-// if we place or remove a block, store the location and block type in the chunk data, and save
-// the chunk data.
+// if we place or remove a block, store the location and block type in the chunk data, and save the chunk data.
 // when we load a chunk, check if that chunk is stored in chunk data, else just generate it normally
 
 // simple terration - trees
@@ -47,8 +46,8 @@
 #define TARGET_FPS 60
 #define FRAME_TIME_NS (1000000000 / TARGET_FPS)
 
-#define NUM_CHUNKS 25
-#define CHUNK_WIDTH 16
+#define NUM_CHUNKS 9
+#define CHUNK_WIDTH 10
 #define CUBES_PER_CHUNK (CHUNK_WIDTH * CHUNK_WIDTH * CHUNK_WIDTH)
 
 #define HOTBAR_SLOTS 9
@@ -297,10 +296,6 @@ void init_stuff() {
 	draw_faces.count = 0;
 	highlighted_cube_face = -1;
 
-	camera_pos.x = 0;
-	camera_pos.y = 10 * CUBE_WIDTH;
-	camera_pos.z = 1 * CUBE_WIDTH;
-
 	player_width = CUBE_WIDTH / 3;
 	player_height = 4 * player_width;
 
@@ -344,7 +339,7 @@ void init_stuff() {
 	//render_hand();
 
 	// setup the world:
-	vec3_t chunk_pos = {-CHUNK_WIDTH * (sqrt(NUM_CHUNKS) / 2) * CUBE_WIDTH, 0, -CHUNK_WIDTH * (sqrt(NUM_CHUNKS) / 2) * CUBE_WIDTH};
+	vec3_t chunk_pos = {0, 0, 0};
 	int count = 0;
 	for (int i = 0; i < sqrt(NUM_CHUNKS); i++) {
 		for (int j = 0; j < sqrt(NUM_CHUNKS); j++) {
@@ -354,6 +349,10 @@ void init_stuff() {
 		}
 	}
 	occupied_chunk_index = NUM_CHUNKS / 2;
+
+	camera_pos.x += (sqrt(NUM_CHUNKS) * CHUNK_WIDTH * CUBE_WIDTH) / 2;
+	camera_pos.y = 10 * CUBE_WIDTH;
+	camera_pos.z += (sqrt(NUM_CHUNKS) * CHUNK_WIDTH * CUBE_WIDTH) / 2;
 
 	return;
 }
@@ -1310,7 +1309,6 @@ void draw_rect(vec3_t top_left, int width, int height, colour_t colour) {
 	fill_square(&square);
 }
 
-// TODO:
 void place_cube(texture_t *texture) {
 	vec3_t pos = {0};
 	pos.x = chunks[occupied_chunk_index].pos.x + ((highlighted_cube_index % CHUNK_WIDTH) * CUBE_WIDTH);
@@ -1519,22 +1517,20 @@ void handle_input()
 	// make the player 2 cubes tall:
 	camera_pos.y -= CUBE_WIDTH;
 
-	// TODO: could compute 1 / cube width and 1 / chunk width to speed this up
 	int old = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
 	int new = old;
     camera_pos.x += x;
 	if (collided()) {
 		camera_pos.x -= x;
 	}
-	else {
-		new = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
-		if (old != new) {
-			if (camera_pos.x < camera_pos.x - x) {
-				update_chunks(X_NEG);
-			}
-			else {
-				update_chunks(X_POS);
-			}
+	new = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
+	printf("\nnew: %d", new);
+	if (old != new || (camera_pos.x * (camera_pos.x - x) < 0)) {
+		if (camera_pos.x < camera_pos.x - x) {
+			update_chunks(X_NEG);
+		}
+		else {
+			update_chunks(X_POS);
 		}
 	}
 
@@ -1551,7 +1547,7 @@ void handle_input()
 	}
 	else {
 		new = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
-		if (old != new) {
+		if (old != new || (camera_pos.z * (camera_pos.z - z) < 0)) {
 			if (camera_pos.z < camera_pos.z - z) {
 				update_chunks(Z_NEG);
 			}
@@ -1646,7 +1642,6 @@ void handle_mouse() {
 	}
 }
 
-// TODO:
 int collided() {
 	for (int cube_i = 0; cube_i < CUBES_PER_CHUNK; cube_i++) {
 		if (chunks[occupied_chunk_index].cubes[cube_i].texture == NULL) {
@@ -2002,7 +1997,6 @@ void generate_textures() {
 	assert(leaf_texture != NULL);
 }
 
-// TODO:
 void update_chunks(int dir) {
 	switch (dir) {
 		case Z_POS: {
