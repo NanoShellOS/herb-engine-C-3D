@@ -353,9 +353,9 @@ void init_stuff() {
 
 	day_cycle = 0;
 	night = 1;
-	cycle_frame_interval = 10;
-	max_day_cycle = 48;
-	night_length = 48;
+	cycle_frame_interval = 1;
+	max_day_cycle = 480;
+	night_length = 480;
 
 	small_height = HEIGHT * 0.01;
 	hotbar_y = HEIGHT - (HEIGHT * 0.1);
