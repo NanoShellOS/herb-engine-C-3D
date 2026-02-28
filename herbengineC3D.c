@@ -2078,10 +2078,10 @@ void generate_chunk(int chunk_i) {
 
 							// make a tree
 							if (rand() % 100 == 0) {
-								if (x < 1 || x > CHUNK_WIDTH - 1) {
+								if (x < 2 || x > CHUNK_WIDTH - 2) {
 									continue;
 								}
-								if (z < 1 || z > CHUNK_WIDTH - 1) {
+								if (z < 2 || z > CHUNK_WIDTH - 2) {
 									continue;
 								}
 								int max_h = 3 + rand() % 10;
