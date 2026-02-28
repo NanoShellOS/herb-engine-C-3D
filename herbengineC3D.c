@@ -14,19 +14,13 @@
 
 // fix hotbar and hand UI
 
-// optimise by lowering resolution of the fill square function - see the TODO note
-
-// bugs:
-
-// fix render issue where some cube faces draw on top of faces in the same cube incorrectly at certain angles
-// fix render issue where sometimes the squares are drawn super large for a split second
-
 // fix place and remove cube to also check neighbouring chunks if at a chunk boundary
-// fix place or remove cube seg fault?
-
+// fix place or remove so you can't place a block above or below the chunk boundary
 // fix collision issue where you get stuck in a block at a chunk boundary
 
-// fix fill squares to accomodate for when the ys of the square are too close
+// optimise by lowering resolution of the fill square function - see the TODO note
+
+// fix render issue where sometimes the squares are drawn super large for a split second
 
 /* ----------------------- defines --------------------- */
 
@@ -1081,16 +1075,6 @@ void fill_square(square_t *square) {
 	if (largest_y > HEIGHT) {
 		largest_y = HEIGHT;
 	}
-
-	// TODO: fix this fix
-	//if (largest_y - smallest_y < 5) {
-		//if (smallest_y > 1) {
-			//smallest_y -= 1;
-		//}
-		//if (largest_y < HEIGHT - 1) {
-			//largest_y += 1;
-		//}
-	//}
 
 	// TODO: could we use y+=2 or smthn instead of y++ here to make it faster?
 	for (int y = smallest_y; y < largest_y; y++) {
