@@ -115,7 +115,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
 
         // --- Mouse ---
-        if (hold_mouse) {
+        if (holding_mouse) {
             if (!prev_hold_mouse) {
                 POINT center = { WIDTH / 2, HEIGHT / 2 };
                 ClientToScreen(hwnd, &center);

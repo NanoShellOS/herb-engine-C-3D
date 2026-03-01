@@ -9,7 +9,7 @@
 
 //TODO:
 
-// clean code
+// be able to switch between flying or jumping
 
 // fix rendering issue when some points have -z the square draws rlly big on screen
 
@@ -281,7 +281,7 @@ static int mouse_left_click = 0;
 static int mouse_was_left_clicked = 0;
 static int mouse_right_click = 0;
 static int mouse_was_right_clicked = 0;
-static int hold_mouse = 1;
+static int holding_mouse = 1;
 static int mouse_defined = 0;
 
 static int keys[256] = {0};
@@ -348,7 +348,7 @@ void init_stuff() {
 	gravity = - CUBE_WIDTH / 6;
 
 	//   - input
-	hold_mouse = 1;
+	holding_mouse = 1;
 	mouse_sensitivity = 0.005f;
 
 	//   - physics
@@ -388,8 +388,100 @@ void init_stuff() {
 	return;
 }
 
+void generate_textures() {
+	// create grass texture
+	// * 3 for top bottom side of cube
+    int width = TEXTURE_WIDTH * 3;
+    int height = TEXTURE_WIDTH;
+    texture_t myImg = {width, height, malloc(width * height * 3)};
+
+	// top
+	int i = 0;
+	for (i; i < SQUARES_PER_FACE; i++) {
+		myImg.data[i] = (colour_t){10 + (rand() % 50), 180 + (rand() % 50), 20 + (rand() % 50), };
+	}
+	// bottom
+	for (i; i < 2 * SQUARES_PER_FACE; i++) {
+		myImg.data[i] = (colour_t){150 + (rand() % 50), 75 + (rand() % 50), 10 + (rand() % 50), };
+	}
+	// side
+	for (i; i < 3 * SQUARES_PER_FACE; i++) {
+		if (i < 2.5 * SQUARES_PER_FACE) {
+			myImg.data[i] = (colour_t){10 + (rand() % 50), 180 + (rand() % 50), 20 + (rand() % 50), };
+		}
+		else {
+			myImg.data[i] = (colour_t){150 + (rand() % 50), 75 + (rand() % 50), 10 + (rand() % 50), };
+		}
+	}
+
+    writePPM("grass.ppm", &myImg);
+
+	grass_texture = readPPM("grass.ppm");
+	assert(grass_texture != NULL);
+
+	// create stone texture
+	// top bottom side
+	i = 0;
+	for (i; i < SQUARES_PER_FACE * 3; i++) {
+		myImg.data[i] = (colour_t){75 + (rand()  % 12), 75 + (rand()  % 13), 75 + (rand()  % 5), };
+	}
+
+    writePPM("stone.ppm", &myImg);
+
+	stone_texture = readPPM("stone.ppm");
+	assert(stone_texture != NULL);
+	
+	// create dirt texture
+	// top bottom side
+	i = 0;
+	for (i; i < SQUARES_PER_FACE * 3; i++) {
+		myImg.data[i] = (colour_t){150 + (rand() % 50), 75 + (rand() % 50), 10 + (rand() % 50), };
+	}
+
+    writePPM("dirt.ppm", &myImg);
+
+	dirt_texture = readPPM("dirt.ppm");
+	assert(dirt_texture != NULL);
+
+	// create wood texture
+	// * 3 for top bottom side of cube
+	// top
+	i = 0;
+	for (i; i < SQUARES_PER_FACE; i++) {
+		myImg.data[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50), };
+	}
+	// bottom
+	for (i; i < 2 * SQUARES_PER_FACE; i++) {
+		myImg.data[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50), };
+	}
+	// side
+	for (i; i < 3 * SQUARES_PER_FACE; i++) {
+		myImg.data[i] = (colour_t){90 + (rand() % 10), 60 + (rand() % 10), 50 + (rand() % 20), };
+	}
+
+    writePPM("wood.ppm", &myImg);
+
+	wood_texture = readPPM("wood.ppm");
+	assert(wood_texture != NULL);
+
+	// create leaf texture
+	// top bottom side
+	i = 0;
+	for (i; i < SQUARES_PER_FACE * 3; i++) {
+		myImg.data[i] = (colour_t){5 - (rand()  % 5), 95 - (rand()  % 20), 7 - (rand()  % 7), };
+	}
+
+    writePPM("leaf.ppm", &myImg);
+
+    free(myImg.data);
+
+	leaf_texture = readPPM("leaf.ppm");
+	assert(leaf_texture != NULL);
+
+	return;
+}
+
 void update() {
-	printf("\n");
 	if (paused) {
 		return;
 	}
@@ -401,6 +493,286 @@ void update() {
 
 	update_pixels();
 	return;
+}
+
+void update_day_cycle() {
+
+	if (night) {
+		if (frame % cycle_frame_interval == 0 && day_cycle < max_day_cycle) {
+			day_cycle += 1;
+		}	
+		if (day_cycle == max_day_cycle) {
+			if (frame % cycle_frame_interval == 0) {
+				night += 1;
+			}
+			if (night == night_length) {
+				night = 0;
+				day = 1;
+			}
+		}
+	}
+	else if (day) {
+		if (frame % cycle_frame_interval == 0 && day_cycle > 0) {
+			day_cycle -= 1;
+		}	
+		if (day_cycle == 0) {
+			if (frame % cycle_frame_interval == 0) {
+				day += 1;
+			}
+			if (day == night_length) {
+				day = 0;
+				night = 1;
+			}
+		}
+	}
+
+	sky.r = (char)((float)max_sky.r * (day_cycle / max_day_cycle));
+	sky.g = (char)((float)max_sky.g * (day_cycle / max_day_cycle));
+	sky.b = (char)((float)max_sky.b * (day_cycle / max_day_cycle));
+
+	return;
+}
+
+void handle_input() {
+
+	handle_mouse();
+
+	// handle keys/movement
+	int x_movement = 0;
+	int y_movement = 0;
+	int z_movement = 0;
+
+	if (keys[control]) {
+        speed = sprint_speed;
+	}
+	else {
+		speed = walk_speed;
+	}
+
+    if (keys[w]) {
+        x_movement += - speed * sine_x_rotation;
+        z_movement += speed * cos_x_rotation;
+	}
+    if (keys[a]) {
+        x_movement += - speed * cos_x_rotation;
+        z_movement += - speed * sine_x_rotation;
+	}
+    if (keys[s]) {
+        x_movement += speed * sine_x_rotation;
+        z_movement += - speed * cos_x_rotation;
+	}
+    if (keys[d]) {
+        x_movement += speed * cos_x_rotation;
+        z_movement += speed * sine_x_rotation;
+	}
+
+    if (keys[space]) {
+		if (! jump) {
+			jump = jump_height;
+		}
+		//y_movement += speed;
+	}
+    if (keys[shift]) {
+        y_movement += - speed;
+	}
+
+	if (keys[escape]) {
+		holding_mouse = 0;
+	}
+
+	y_movement += gravity;
+	y_movement += jump / 5;
+	if (jump > 0) {
+		jump -= (jump_height * 0.04);
+	}
+	else {
+		jump = 0;
+	}
+
+	// make the player 2 cubes tall:
+	camera_pos.y -= CUBE_WIDTH;
+
+	int old = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
+	// account for the fact 6 / 10 = 0 and - 6 / 10 = 0
+	if (camera_pos.x < 0) {
+		old--;
+	}
+	int new = old;
+
+    camera_pos.x += x_movement;
+	if (collided()) {
+		camera_pos.x -= x_movement;
+	}
+
+	new = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
+	if (camera_pos.x < 0) {
+		new--;
+	}
+	if (old != new) {
+		// means we crossed a chunk border
+		if (camera_pos.x < camera_pos.x - x_movement) {
+			update_chunks(X_NEG);
+		}
+		else {
+			update_chunks(X_POS);
+		}
+	}
+
+    camera_pos.y += y_movement;
+	if (collided()) {
+		camera_pos.y -= y_movement;
+	}
+
+	old = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
+	if (camera_pos.z < 0) {
+		old--;
+	}
+	new = old;
+
+    camera_pos.z += z_movement;
+	if (collided()) {
+		camera_pos.z -= z_movement;
+	}
+
+	new = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
+	if (camera_pos.z < 0) {
+		new--;
+	}
+	if (old != new) {
+		if (camera_pos.z < camera_pos.z - z_movement) {
+			update_chunks(Z_NEG);
+		}
+		else {
+			update_chunks(Z_POS);
+		}
+	}
+	
+	// make the player 2 cubes tall:
+	camera_pos.y += CUBE_WIDTH;
+
+	//vec3_t pos = {camera_pos.x + 2 * CUBE_WIDTH, camera_pos.y - 0.5 * CUBE_WIDTH, camera_pos.z + 0.5 * CUBE_WIDTH};
+	if (keys[one]) {
+		hotbar_selection = 0;
+		//hand_cubes.count = 0;
+		//render_hand();
+	}
+	if (keys[two]) {
+		hotbar_selection = 1;
+		//hand_cubes.count = 0;
+		//render_hand();
+	}
+	if (keys[three]) {
+		hotbar_selection = 2;
+		//hand_cubes.count = 0;
+		//render_hand();
+	}
+	if (keys[four]) {
+		hotbar_selection = 3;
+		//hand_cubes.count = 0;
+		//render_hand();
+	}
+	return;
+}
+
+void handle_mouse() {
+
+	if (mouse_left_click) {
+		holding_mouse = 1;
+		mouse_was_left_clicked = 1;
+	}
+	else {
+		if (mouse_was_left_clicked) {
+			if (highlighted_cube_face > -1) {
+				player_remove_cube();
+			}
+		}
+		mouse_was_left_clicked = 0;
+	}
+	if (mouse_right_click) {
+		mouse_was_right_clicked = 1;
+	}
+	else {
+		if (mouse_was_right_clicked) {
+			if (highlighted_cube_face > -1) {
+				player_place_cube();
+			}
+		}
+		mouse_was_right_clicked = 0;
+	}
+
+	if (holding_mouse) {
+		int dx = mouse.x - (WIDTH / 2);
+		int dy = mouse.y - (HEIGHT / 2);
+
+		x_rotation -= dx * mouse_sensitivity;
+		y_rotation += dy * mouse_sensitivity;
+
+		if (y_rotation > 3.141 / 2) {
+			y_rotation = 3.141 / 2;
+		}
+		if (y_rotation < -3.141 / 2) {
+			y_rotation = -3.141 / 2;
+		}
+	}
+
+	sine_x_rotation = sin(x_rotation);
+	sine_y_rotation = sin(y_rotation);
+
+	cos_x_rotation = cos(x_rotation);
+	cos_y_rotation = cos(y_rotation);
+
+	return;
+}
+
+int collided() {
+
+	for (int cube_i = 0; cube_i < CUBES_PER_CHUNK; cube_i++) {
+
+		if (chunks[occupied_chunk_index].cubes[cube_i].texture == NULL) {
+			continue;
+		}
+
+		// x1 = top left front
+		int x1 = chunks[occupied_chunk_index].pos.x + ((cube_i % CHUNK_WIDTH) * CUBE_WIDTH);
+		int y1 = chunks[occupied_chunk_index].pos.y + (((cube_i / CHUNK_WIDTH) % CHUNK_WIDTH) * CUBE_WIDTH);
+		int z1 = chunks[occupied_chunk_index].pos.z + (((cube_i / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH) * CUBE_WIDTH);
+
+		// x2 = bottom right back
+		int x2 = x1 + CUBE_WIDTH;	
+		int y2 = y1 - CUBE_WIDTH;	
+		int z2 = z1 + CUBE_WIDTH;
+
+		// player_x1 = top left front
+		int player_x1 = camera_pos.x - player_width;
+		int player_y1 = camera_pos.y + player_height;
+		int player_z1 = camera_pos.z - player_width;
+
+		// player_x1 = bottom right back
+		int player_x2 = camera_pos.x + player_width;
+		int player_y2 = camera_pos.y - player_width;
+		int player_z2 = camera_pos.z + player_width;
+
+		int x_collision = 0;
+		int y_collision = 0;
+		int z_collision = 0;
+
+		if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
+			// xs overlap
+			x_collision = 1;
+		}
+		if ((player_y1 <= y1 && player_y1 >= y2) || (player_y2 <= y1 && player_y2 >= y2)) {
+			// ys overlap
+			y_collision = 1;
+		}
+		if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
+			// zs overlap
+			z_collision = 1;
+		}
+		if (x_collision && y_collision && z_collision) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 void update_pixels() {
@@ -428,6 +800,12 @@ colour_t unpack_colour_from_uint32(uint32_t packed_colour) {
 	colour.g = (packed_colour >> 8) & 255;
 	colour.b = packed_colour & 255;
     return colour;
+}
+
+colour_t get_pixel_colour(vec2_t coord) {
+	uint32_t packed_colour = pixels[coord.y * WIDTH + coord.x];
+
+	return unpack_colour_from_uint32(packed_colour);
 }
 
 void clear_screen(colour_t colour) {
@@ -816,6 +1194,11 @@ void render_chunks() {
 	int y = ((highlighted_cube_index / CHUNK_WIDTH) % CHUNK_WIDTH);
 	int z = ((highlighted_cube_index / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH);
 
+	// if it is, need to make sure we have the right chunk and cube index
+	// as if the cube we're looking at is in the chunk to the right,
+	// and we're looking at the left side of the cube,
+	// highlighted_chunk_i will need to be the index of the chunk to the left of that,
+	// and highlighted_cube_i will need to be the right most cube in that chunk etc
 	if (x == 0) {
 		if (highlighted_cube_face == LEFT) {
 			int left_chunk_i = highlighted_cube_chunk_index - SQRT_NUM_CHUNKS;
@@ -862,6 +1245,7 @@ void render_chunks() {
 
 	// sort the faces based on their distance to the camera
 	qsort(draw_faces.items, draw_faces.count, sizeof(face_t), compare_faces);
+	return;
 }
 
 int compare_faces(const void *one, const void *two) {
@@ -879,6 +1263,94 @@ int compare_faces(const void *one, const void *two) {
 	}
 
 	return 0;
+}
+
+int square_surrounds_centre(square_t *square) {
+
+	int left_x = WIDTH;
+	int right_x = -WIDTH;
+	int top_y = HEIGHT;
+	int bottom_y = -HEIGHT;
+	int count = 0;
+	for (int i = 0; i < 4; i++) {
+		if (square->coords[i].x < left_x) {
+			left_x = square->coords[i].x;
+		}	
+		if (square->coords[i].x > right_x) {
+			right_x = square->coords[i].x;
+		}	
+		if (square->coords[i].y > bottom_y) {
+			bottom_y = square->coords[i].y;
+		}
+		if (square->coords[i].y < top_y) {
+			top_y = square->coords[i].y;
+		}
+		if (square->coords[i].z < 0) {
+			count++;
+		}
+	}
+	if (count == 4) {
+		return 0;
+	}
+	if (left_x <= WIDTH / 2 && right_x >= WIDTH / 2 && top_y <= HEIGHT / 2 && bottom_y >= HEIGHT / 2) {
+		return 1;
+	}
+
+	return 0;
+}
+
+void set_fog_level(colour_t *c, float fog_r) {
+
+	if (fog_r > FOG_DIST) {
+		float fog_percent = fog_r - FOG_DIST;
+		fog_percent = (fog_percent * 100) / FOG_MAX;
+		if (fog_percent > 100) {
+			fog_percent = 100;
+		}
+		c->r += (((float)sky.r - (float)c->r) / 100) * fog_percent;
+		c->g += (((float)sky.g - (float)c->g) / 100) * fog_percent;
+		c->b += (((float)sky.b - (float)c->b) / 100) * fog_percent;
+	}
+
+	return;
+}
+
+void set_light_level(colour_t *c, float fog_r) {
+
+	float illumination = 1.0f / (fog_r * 0.001);
+	illumination += day_cycle / max_day_cycle;
+	if (illumination > 1) {
+		illumination = 1;
+	}
+
+	float r = ((float)c->r) * illumination;
+	float g = ((float)c->g) * illumination;
+	float b = ((float)c->b) * illumination;
+
+	if (r < 0) {
+		r == 0;
+	}
+	else if (r > c->r) {
+		r = c->r;
+	}
+	if (g < 0) {
+		g == 0;
+	}
+	else if (g > c->g) {
+		g = c->g;
+	}
+	if (b < 0) {
+		b == 0;
+	}
+	else if (b > c->b) {
+		b = c->b;
+	}
+
+	c->r = (char) r;
+	c->g = (char) g;
+	c->b = (char) b;
+
+	return;
 }
 
 vec3_t rotate_and_project(vec3_t pos) {
@@ -913,92 +1385,74 @@ vec3_t rotate_and_project(vec3_t pos) {
 	return new_pos;
 }
 
+void rotate_and_project_by_rot_value(vec3_t *pos, vec3_t *new_pos, float x_rot, float y_rot) {
+
+	// rotate
+	new_pos->x = (pos->z * sin(x_rot) + pos->x * cos(x_rot));
+	int z2 = (pos->z * cos(x_rot) - pos->x * sin(x_rot));
+
+	new_pos->y = (z2 * sin(y_rot) + pos->y * cos(y_rot));
+	new_pos->z = (z2 * cos(y_rot) - pos->y * sin(y_rot));
+
+	int neg = 0;
+	if (new_pos->z == 0) {
+		neg = 1;
+		// avoid divide by 0
+		new_pos->z = 7;
+	}
+
+	// project
+	float percent_size = ((float)((WIDTH / 10) * FOV) / new_pos->z);
+	new_pos->x *= percent_size;
+	new_pos->y *= percent_size;
+
+	// convert from standard grid to screen grid
+	new_pos->x = new_pos->x + WIDTH / 2;
+	new_pos->y = -new_pos->y + HEIGHT / 2;
+
+	if (neg) {
+		new_pos->z = -1;
+	}
+
+	return;
+}
+
+void render_hotbar() {
+			//// for each square of each face of the cube
+			//for (int k = 0; k < SQUARES_PER_FACE; k++) {
+//
+			    //square_t new_square = {0};
+				//for (int l = 0; l < 4; l++) {
+					//vec3_t pos = {0};
+					//pos.x = hotbar_cubes.items[i].faces[j].squares[k].coords[l].x;
+					//pos.y = hotbar_cubes.items[i].faces[j].squares[k].coords[l].y;
+					//pos.z = hotbar_cubes.items[i].faces[j].squares[k].coords[l].z;
+					//pos.x -= camera_pos.x;
+					//pos.y -= camera_pos.y;
+					//pos.z -= camera_pos.z;
+//
+					//vec3_t new_pos = {0};
+					//rotate_and_project_by_rot_value(&pos, &new_pos, 0, 0);
+//
+					//new_square.coords[l].x = new_pos.x - (WIDTH / 2) + ((i + 1.2) * HOTBAR_SLOT_WIDTH);
+					//new_square.coords[l].y = new_pos.y + (HEIGHT / 2) - (HEIGHT - hotbar_y) - HOTBAR_SLOT_WIDTH;
+					//new_square.coords[l].z = new_pos.z;
+					//new_square.colour = hotbar_cubes.items[i].faces[j].squares[k].colour;
+				//}
+	return;
+}
+
+void render_hand() {
+	return;
+}
+
 void draw_all_faces() {
 	for (int i = 0; i < draw_faces.count; i++) {
 		for (int j = 0; j < SQUARES_PER_FACE; j++) {
 			fill_square(&draw_faces.items[i].squares[j]);
 		}
 	}
-}
-
-void draw_cursor() {
-	colour_t colour = get_pixel_colour((vec2_t){WIDTH / 2, HEIGHT / 2});
-	if (colour.r > 127) {
-		colour.r = 0;
-	}
-	else {
-		colour.r = 255;
-	}
-	if (colour.g > 127) {
-		colour.g = 0;
-	}
-	else {
-		colour.g = 255;
-	}
-	if (colour.b > 127) {
-		colour.b = 0;
-	}
-	else {
-		colour.b = 255;
-	}
-	int h = 30;
-	int w = 6;
-	draw_rect((vec3_t){WIDTH / 2 - (w / 2), HEIGHT / 2 - (h / 2), 1}, w, h, colour);
-	draw_rect((vec3_t){WIDTH / 2 - (h / 2), HEIGHT / 2 - (w / 2), 1}, h, w, colour);
-}
-
-void draw_hotbar() {
-	int x = hotbar_x;
-	int y = hotbar_y;
-
-	int w = hotbar_width;
-	int h = hotbar_height;
-    draw_rect((vec3_t){x, y, 1}, w, small_height, hotbar_colour);
-	y -= h;
-    draw_rect((vec3_t){x, y, 1}, w, small_height, hotbar_colour);
-
-    draw_rect((vec3_t){x, y, 1}, small_height, h, hotbar_colour);
-	x += w;
-    draw_rect((vec3_t){x, y, 1}, small_height, h, hotbar_colour);
-
-	switch(hotbar_selection) {
-		case 0: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 0), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 1: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 1), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 2: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 2), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 3: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 3), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-	}
-
-	//for (int i = 0; i < hotbar_faces.count; i++) {
-		//for (int j = 0; j < SQUARES_PER_FACE; j++) {
-			//fill_square(&hotbar_faces.items[i].squares[j]);
-		//}
-	//}
-}
-
-void draw_hand() {
-	//for (int i = 0; i < hand_faces.count; i++) {
-		//for (int j = 0; j < SQUARES_PER_FACE; j++) {
-			//fill_square(&hand_faces.items[i].squares[j]);
-		//}
-	//}
-}
-
-colour_t get_pixel_colour(vec2_t coord) {
-	uint32_t packed_colour = pixels[coord.y * WIDTH + coord.x];
-
-	return unpack_colour_from_uint32(packed_colour);
+	return;
 }
 
 void fill_square(square_t *square) {
@@ -1193,6 +1647,84 @@ void draw_rect(vec3_t top_left, int width, int height, colour_t colour) {
 	square.colour = pack_colour_to_uint32(&colour);
 
 	fill_square(&square);
+	return;
+}
+
+void draw_cursor() {
+	colour_t colour = get_pixel_colour((vec2_t){WIDTH / 2, HEIGHT / 2});
+	if (colour.r > 127) {
+		colour.r = 0;
+	}
+	else {
+		colour.r = 255;
+	}
+	if (colour.g > 127) {
+		colour.g = 0;
+	}
+	else {
+		colour.g = 255;
+	}
+	if (colour.b > 127) {
+		colour.b = 0;
+	}
+	else {
+		colour.b = 255;
+	}
+	int h = 30;
+	int w = 6;
+	draw_rect((vec3_t){WIDTH / 2 - (w / 2), HEIGHT / 2 - (h / 2), 1}, w, h, colour);
+	draw_rect((vec3_t){WIDTH / 2 - (h / 2), HEIGHT / 2 - (w / 2), 1}, h, w, colour);
+	return;
+}
+
+void draw_hotbar() {
+	int x = hotbar_x;
+	int y = hotbar_y;
+
+	int w = hotbar_width;
+	int h = hotbar_height;
+    draw_rect((vec3_t){x, y, 1}, w, small_height, hotbar_colour);
+	y -= h;
+    draw_rect((vec3_t){x, y, 1}, w, small_height, hotbar_colour);
+
+    draw_rect((vec3_t){x, y, 1}, small_height, h, hotbar_colour);
+	x += w;
+    draw_rect((vec3_t){x, y, 1}, small_height, h, hotbar_colour);
+
+	switch(hotbar_selection) {
+		case 0: {
+			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 0), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
+			break;
+		}
+		case 1: {
+			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 1), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
+			break;
+		}
+		case 2: {
+			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 2), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
+			break;
+		}
+		case 3: {
+			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 3), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
+			break;
+		}
+	}
+
+	//for (int i = 0; i < hotbar_faces.count; i++) {
+		//for (int j = 0; j < SQUARES_PER_FACE; j++) {
+			//fill_square(&hotbar_faces.items[i].squares[j]);
+		//}
+	//}
+	return;
+}
+
+void draw_hand() {
+	//for (int i = 0; i < hand_faces.count; i++) {
+		//for (int j = 0; j < SQUARES_PER_FACE; j++) {
+			//fill_square(&hand_faces.items[i].squares[j]);
+		//}
+	//}
+	return;
 }
 
 int place_cube(int chunk_i, int cube_i, texture_t *texture) {
@@ -1248,6 +1780,9 @@ int place_cube(int chunk_i, int cube_i, texture_t *texture) {
 
 	// set neighbour faces
 	if (block_above) {
+		// cube_i + - 1 goes right or left one cube
+		// cube_i + - CHUNK_WIDTH goes up or down one cube
+		// cube_i + - CHUNK_WIDTH * CHUNK_WIDTH goes back or forward one cube
 		if (chunks[chunk_i].cubes[cube_i + CHUNK_WIDTH].texture != NULL) {
 			chunks[chunk_i].cubes[cube_i + CHUNK_WIDTH].bottom_neighbour = 1;
 			chunks[chunk_i].cubes[cube_i].top_neighbour = 1;
@@ -1398,551 +1933,137 @@ void remove_cube(int chunk_i, int cube_i) {
 	return;
 }
 
+void player_place_cube() {
+	vec3_t pos = {0};
+
+	pos.x = chunks[highlighted_cube_chunk_index].pos.x + (highlighted_cube_index % CHUNK_WIDTH);
+	pos.y = chunks[highlighted_cube_chunk_index].pos.y + ((highlighted_cube_index / CHUNK_WIDTH) % CHUNK_WIDTH);
+	pos.z = chunks[highlighted_cube_chunk_index].pos.z + ((highlighted_cube_index / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH);
+
+	int index_diff = 0;
+	switch (highlighted_cube_face) {
+		case TOP: {
+			pos.y += CUBE_WIDTH;
+			index_diff = CHUNK_WIDTH;
+			break;
+		}
+		case FRONT: {
+			pos.z -= CUBE_WIDTH;
+			index_diff = - CHUNK_WIDTH * CHUNK_WIDTH;
+			break;
+		}
+		case LEFT: {
+			pos.x -= CUBE_WIDTH;
+			index_diff = -1;
+			break;
+		}
+		case BACK: {
+			pos.z += CUBE_WIDTH;
+			index_diff = CHUNK_WIDTH * CHUNK_WIDTH;
+			break;
+		}
+		case RIGHT: {
+			pos.x += CUBE_WIDTH;
+			index_diff = 1;
+			break;
+		}
+		case BOTTOM: {
+			pos.y -= CUBE_WIDTH;
+			index_diff = -CHUNK_WIDTH;
+			break;
+		}
+	}
+	int x1 = pos.x;
+	int y1 = pos.y;
+	int z1 = pos.z;
+
+	// x2 = bottom right back
+	int x2 = x1 + CUBE_WIDTH;	
+	int y2 = y1 - CUBE_WIDTH;	
+	int z2 = z1 + CUBE_WIDTH;
+
+	// player is 2 cubes high
+	camera_pos.y -= CUBE_WIDTH;
+
+	// player_x1 = top left front
+	int player_x1 = camera_pos.x - player_width;
+	int player_y1 = camera_pos.y + player_height;
+	int player_z1 = camera_pos.z - player_width;
+
+	// player_x1 = bottom right back
+	int player_x2 = camera_pos.x + player_width;
+	int player_y2 = camera_pos.y - player_width;
+	int player_z2 = camera_pos.z + player_width;
+
+	int x_collision = 0;
+	int y_collision = 0;
+	int z_collision = 0;
+
+	if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
+		// xs overlap
+		x_collision = 1;
+	}
+	if ((player_y1 <= y1 && player_y1 >= y2) || (player_y2 <= y1 && player_y2 >= y2)) {
+		// ys overlap
+		y_collision = 1;
+	}
+	if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
+		// zs overlap
+		z_collision = 1;
+	}
+
+	// player is 2 cubes high
+	camera_pos.y += CUBE_WIDTH;
+
+	if (x_collision && y_collision && z_collision) {
+		return;
+	}
+
+	texture_t *texture = grass_texture;
+
+	switch (hotbar_selection) {
+		case 0: {
+			// grass
+			break;
+		}
+		case 1: {
+			texture = stone_texture;
+			break;
+		}
+		case 2: {
+			texture = wood_texture;
+			break;
+		}
+		case 3: {
+			texture = leaf_texture;
+			break;
+		}
+	}
+
+	int cube_i = highlighted_cube_index + index_diff;
+	place_cube(highlighted_cube_chunk_index, cube_i, texture);
+	add_edit(highlighted_cube_chunk_index, cube_i, texture);
+
+	return;	
+}
+
 void player_remove_cube() {
 	add_edit(highlighted_cube_chunk_index, highlighted_cube_index, NULL);
 
 	remove_cube(highlighted_cube_chunk_index, highlighted_cube_index);
-}
-
-void handle_input()
-{
-	handle_mouse();
-
-	// handle keys/movement
-	int x = 0;
-	int z = 0;
-	int y = 0;
-	if (keys[control]) {
-        speed = sprint_speed;
-	}
-	else {
-		speed = walk_speed;
-	}
-    if (keys[w]) {
-        x += - speed * sin(x_rotation);
-        z += speed * cos(x_rotation);
-	}
-    if (keys[a]) {
-        x += - speed * cos(x_rotation);
-        z += - speed * sin(x_rotation);
-	}
-    if (keys[s]) {
-        x += speed * sin(x_rotation);
-        z += - speed * cos(x_rotation);
-	}
-    if (keys[d]) {
-        x += speed * cos(x_rotation);
-        z += speed * sin(x_rotation);
-	}
-    if (keys[space]) {
-		if (! jump) {
-			jump = jump_height;
-		}
-		//y += speed;
-	}
-    if (keys[shift]) {
-        y += - speed;
-	}
-	if (keys[escape]) {
-		hold_mouse = 0;
-	}
-
-	y += gravity;
-	y += jump / 5;
-	if (jump > 0) {
-		jump -= (jump_height * 0.04);
-	}
-	else {
-		jump = 0;
-	}
-
-	// make the player 2 cubes tall:
-	camera_pos.y -= CUBE_WIDTH;
-
-	int old = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
-	// account for the fact 6 / 10 = 0 and - 6 / 10 = 0
-	if (camera_pos.x < 0) {
-		old--;
-	}
-	int new = old;
-
-    camera_pos.x += x;
-	if (collided()) {
-		camera_pos.x -= x;
-	}
-
-	new = ((camera_pos.x / CUBE_WIDTH) / CHUNK_WIDTH);
-	if (camera_pos.x < 0) {
-		new--;
-	}
-	if (old != new) {
-		if (camera_pos.x < camera_pos.x - x) {
-			update_chunks(X_NEG);
-		}
-		else {
-			update_chunks(X_POS);
-		}
-	}
-
-    camera_pos.y += y;
-	if (collided()) {
-		camera_pos.y -= y;
-	}
-
-	old = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
-	if (camera_pos.z < 0) {
-		old--;
-	}
-	new = old;
-
-    camera_pos.z += z;
-	if (collided()) {
-		camera_pos.z -= z;
-	}
-
-	new = ((camera_pos.z / CUBE_WIDTH) / CHUNK_WIDTH);
-	if (camera_pos.z < 0) {
-		new--;
-	}
-	if (old != new) {
-		if (camera_pos.z < camera_pos.z - z) {
-			update_chunks(Z_NEG);
-		}
-		else {
-			update_chunks(Z_POS);
-		}
-	}
-	
-	camera_pos.y += CUBE_WIDTH;
-
-	//vec3_t pos = {camera_pos.x + 2 * CUBE_WIDTH, camera_pos.y - 0.5 * CUBE_WIDTH, camera_pos.z + 0.5 * CUBE_WIDTH};
-	if (keys[one]) {
-		hotbar_selection = 0;
-		//hand_cubes.count = 0;
-		//render_hand();
-	}
-	if (keys[two]) {
-		hotbar_selection = 1;
-		//hand_cubes.count = 0;
-		//render_hand();
-	}
-	if (keys[three]) {
-		hotbar_selection = 2;
-		//hand_cubes.count = 0;
-		//render_hand();
-	}
-	if (keys[four]) {
-		hotbar_selection = 3;
-		//hand_cubes.count = 0;
-		//render_hand();
-	}
-}
-
-void handle_mouse() {
-	if (mouse_left_click) {
-		hold_mouse = 1;
-		mouse_was_left_clicked = 1;
-	}
-	else {
-		if (mouse_was_left_clicked) {
-			if (highlighted_cube_face > -1) {
-				player_remove_cube();
-			}
-		}
-		mouse_was_left_clicked = 0;
-	}
-	if (mouse_right_click) {
-		mouse_was_right_clicked = 1;
-	}
-	else {
-		if (mouse_was_right_clicked) {
-			if (highlighted_cube_face > -1) {
-				player_place_cube();
-			}
-		}
-		mouse_was_right_clicked = 0;
-	}
-	if (hold_mouse) {
-		int dx = mouse.x - (WIDTH / 2);
-		int dy = mouse.y - (HEIGHT / 2);
-
-		x_rotation -= dx * mouse_sensitivity;
-		y_rotation += dy * mouse_sensitivity;
-
-		// Clamp vertical rotation
-		if (y_rotation > 3.141/2) y_rotation = 3.141/2;
-		if (y_rotation < -3.141/2) y_rotation = -3.141/2;
-
-	}
-	sine_x_rotation = sin(x_rotation);
-	sine_y_rotation = sin(y_rotation);
-
-	cos_x_rotation = cos(x_rotation);
-	cos_y_rotation = cos(y_rotation);
-}
-
-int collided() {
-	for (int cube_i = 0; cube_i < CUBES_PER_CHUNK; cube_i++) {
-		if (chunks[occupied_chunk_index].cubes[cube_i].texture == NULL) {
-			continue;
-		}
-		// x1 = top left front
-		int x1 = chunks[occupied_chunk_index].pos.x + ((cube_i % CHUNK_WIDTH) * CUBE_WIDTH);
-		int y1 = chunks[occupied_chunk_index].pos.y + (((cube_i / CHUNK_WIDTH) % CHUNK_WIDTH) * CUBE_WIDTH);
-		int z1 = chunks[occupied_chunk_index].pos.z + (((cube_i / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH) * CUBE_WIDTH);
-
-		// x2 = bottom right back
-		int x2 = x1 + CUBE_WIDTH;	
-		int y2 = y1 - CUBE_WIDTH;	
-		int z2 = z1 + CUBE_WIDTH;
-
-		// player_x1 = top left front
-		int player_x1 = camera_pos.x - player_width;
-		int player_y1 = camera_pos.y + player_height;
-		int player_z1 = camera_pos.z - player_width;
-
-		// player_x1 = bottom right back
-		int player_x2 = camera_pos.x + player_width;
-		int player_y2 = camera_pos.y - player_width;
-		int player_z2 = camera_pos.z + player_width;
-
-		int x_collision = 0;
-		int y_collision = 0;
-		int z_collision = 0;
-		if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
-			// xs overlap
-			x_collision = 1;
-		}
-		if ((player_y1 <= y1 && player_y1 >= y2) || (player_y2 <= y1 && player_y2 >= y2)) {
-			// ys overlap
-			y_collision = 1;
-		}
-		if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
-			// zs overlap
-			z_collision = 1;
-		}
-		if (x_collision && y_collision && z_collision) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-void writePPM(const char *filename, texture_t *img) {
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
-		assert(0);
-	}
-
-    fprintf(fp, "P6\n%d %d\n255\n", img->width, img->height);
-    
-    fwrite(img->data, 3, img->width * img->height, fp);
-    fclose(fp);
-}
-
-texture_t* readPPM(const char *filename) {
-    FILE *fp = fopen(filename, "rb");
-    if (!fp) return NULL;
-
-    char header[3];
-    int width, height, maxVal;
-
-    if (fscanf(fp, "%2s", header) != 1 || strcmp(header, "P6") != 0) {
-        fclose(fp);
-        return NULL;
-    }
-
-    if (fscanf(fp, "%d %d", &width, &height) != 2) {
-        fclose(fp);
-        return NULL;
-    }
-
-    if (fscanf(fp, "%d", &maxVal) != 1 || maxVal != 255) {
-        fclose(fp);
-        return NULL;
-    }
-
-    fgetc(fp);  // consume exactly one byte
-
-    texture_t *img = malloc(sizeof(texture_t));
-    img->width = width;
-    img->height = height;
-    img->data = malloc(width * height * sizeof(colour_t));
-
-    if (fread(img->data,
-              sizeof(colour_t),
-              width * height,
-              fp) != width * height) {
-        free(img->data);
-        free(img);
-        fclose(fp);
-        return NULL;
-    }
-
-    fclose(fp);
-    return img;
-}
-
-void debug_log(char *str) {
-	printf("\n%s", str);
-}
-
-void cleanup() {
-	//free(hand_cubes.items);
-	//free(hand_faces.items);
-	//free(hotbar_cubes.items);
-	//free(hotbar_faces.items);
-    free(pixels);
-}
-
-void render_hotbar() {
-	//// render the hotbar squares:
-	//hotbar_faces.count = 0;
-//
-	//// for each cube
-	//for (int i = 0; i < hotbar_cubes.count; i++) {
-//
-		//for (int j = 0; j < 6; j++) {
-//
-			//// top left coord
-			//int x1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].x;
-			//int y1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].y;
-			//int z1 = hotbar_cubes.items[i].faces[j].squares[0].coords[0].z;
-//
-			//// bottom right coord
-			//x1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].x;
-			//y1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].y;
-			//z1 += hotbar_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].z;
-//
-			//x1 /= 2;
-			//y1 /= 2;
-			//z1 /= 2;
-//
-			//// calc distance to camera
-			//int r = sqrt((x1 * x1) + (y1 * y1) + (z1 * z1));
-//
-			//face_t new_face = {0};
-			//new_face.r = r;
-//
-			//// for each square of each face of the cube
-			//for (int k = 0; k < SQUARES_PER_FACE; k++) {
-//
-			    //square_t new_square = {0};
-				//for (int l = 0; l < 4; l++) {
-					//vec3_t pos = {0};
-					//pos.x = hotbar_cubes.items[i].faces[j].squares[k].coords[l].x;
-					//pos.y = hotbar_cubes.items[i].faces[j].squares[k].coords[l].y;
-					//pos.z = hotbar_cubes.items[i].faces[j].squares[k].coords[l].z;
-					//pos.x -= camera_pos.x;
-					//pos.y -= camera_pos.y;
-					//pos.z -= camera_pos.z;
-//
-					//vec3_t new_pos = {0};
-					//rotate_and_project_by_rot_value(&pos, &new_pos, 0, 0);
-//
-					//new_square.coords[l].x = new_pos.x - (WIDTH / 2) + ((i + 1.2) * HOTBAR_SLOT_WIDTH);
-					//new_square.coords[l].y = new_pos.y + (HEIGHT / 2) - (HEIGHT - hotbar_y) - HOTBAR_SLOT_WIDTH;
-					//new_square.coords[l].z = new_pos.z;
-					//new_square.colour = hotbar_cubes.items[i].faces[j].squares[k].colour;
-				//}
-//
-				//new_face.squares[k] = new_square;
-			//}
-//
-			//hotbar_faces.items[hotbar_faces.count++] = new_face;
-		//}
-	//}
-//
-	//// sort the faces based on their distance to the camera
-	//qsort(hotbar_faces.items, hotbar_faces.count, sizeof(face_t), compare_faces);
-}
-
-void render_hand() {
-	//// render the hand squares:
-	//hand_faces.count = 0;
-//
-	//// for each cube
-	//for (int i = 0; i < hand_cubes.count; i++) {
-//
-		//for (int j = 0; j < 6; j++) {
-//
-			//// top left coord
-			//int x1 = hand_cubes.items[i].faces[j].squares[0].coords[0].x - camera_pos.x;
-			//int y1 = hand_cubes.items[i].faces[j].squares[0].coords[0].y - camera_pos.y;
-			//int z1 = hand_cubes.items[i].faces[j].squares[0].coords[0].z - camera_pos.z;
-//
-			//// bottom right coord
-			//x1 += hand_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].x - camera_pos.x;
-			//y1 += hand_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].y - camera_pos.y;
-			//z1 += hand_cubes.items[i].faces[j].squares[SQUARES_PER_FACE - 1].coords[0].z - camera_pos.z;
-//
-			//x1 /= 2;
-			//y1 /= 2;
-			//z1 /= 2;
-//
-			//// calc distance to camera
-			//int r = sqrt((x1 * x1) + (y1 * y1) + (z1 * z1));
-//
-			//face_t new_face = {0};
-			//new_face.r = r;
-//
-			//// for each square of each face of the cube
-			//for (int k = 0; k < SQUARES_PER_FACE; k++) {
-//
-			    //square_t new_square = {0};
-				//for (int l = 0; l < 4; l++) {
-					//vec3_t pos = {0};
-					//pos.x = hand_cubes.items[i].faces[j].squares[k].coords[l].x;
-					//pos.y = hand_cubes.items[i].faces[j].squares[k].coords[l].y;
-					//pos.z = hand_cubes.items[i].faces[j].squares[k].coords[l].z;
-					//pos.x -= camera_pos.x;
-					//pos.y -= camera_pos.y;
-					//pos.z -= camera_pos.z;
-//
-					//vec3_t new_pos = {0};
-					//rotate_and_project_by_rot_value(&pos, &new_pos, 0, 0);
-//
-					//new_square.coords[l].x = new_pos.x;
-					//new_square.coords[l].y = new_pos.y;
-					//new_square.coords[l].z = new_pos.z;
-					//new_square.colour = hand_cubes.items[i].faces[j].squares[k].colour;
-				//}
-//
-				//new_face.squares[k] = new_square;
-			//}
-//
-			//hand_faces.items[hand_faces.count++] = new_face;
-		//}
-	//}
-//
-	//// sort the faces based on their distance to the camera
-	//qsort(hand_faces.items, hand_faces.count, sizeof(face_t), compare_faces);
-}
-
-void rotate_and_project_by_rot_value(vec3_t *pos, vec3_t *new_pos, float x_rot, float y_rot) {
-
-	// rotate
-	new_pos->x = (pos->z * sin(x_rot) + pos->x * cos(x_rot));
-	int z2 = (pos->z * cos(x_rot) - pos->x * sin(x_rot));
-
-	new_pos->y = (z2 * sin(y_rot) + pos->y * cos(y_rot));
-	new_pos->z = (z2 * cos(y_rot) - pos->y * sin(y_rot));
-	if (new_pos->z == 0) {
-		new_pos->z = 1;
-	}
-
-	// project
-	float percent_size = ((float)((WIDTH / 10) * FOV) / new_pos->z);
-	if (new_pos->z > 0) {
-		new_pos->x *= percent_size;
-		new_pos->y *= percent_size;
-	}
-	else {
-		new_pos->z = 0;
-	}
-
-	// convert from standard grid to screen grid
-	new_pos->x = new_pos->x + WIDTH / 2;
-	new_pos->y = -new_pos->y + HEIGHT / 2;
-}
-
-void generate_textures() {
-	// create grass texture
-	// * 3 for top bottom side of cube
-    int w = TEXTURE_WIDTH * 3, h = TEXTURE_WIDTH;
-    texture_t myImg = {w, h, malloc(w * h * 3)};
-
-	// top
-	int i = 0;
-	for (i; i < SQUARES_PER_FACE; i++) {
-		myImg.data[i] = (colour_t){10 + (rand() % 50), 180 + (rand() % 50), 20 + (rand() % 50), };
-	}
-	// bottom
-	for (i; i < 2 * SQUARES_PER_FACE; i++) {
-		myImg.data[i] = (colour_t){150 + (rand() % 50), 75 + (rand() % 50), 10 + (rand() % 50), };
-	}
-	// side
-	for (i; i < 3 * SQUARES_PER_FACE; i++) {
-		if (i < 2.5 * SQUARES_PER_FACE) {
-			myImg.data[i] = (colour_t){10 + (rand() % 50), 180 + (rand() % 50), 20 + (rand() % 50), };
-		}
-		else {
-			myImg.data[i] = (colour_t){150 + (rand() % 50), 75 + (rand() % 50), 10 + (rand() % 50), };
-		}
-	}
-
-    writePPM("grass.ppm", &myImg);
-
-	grass_texture = readPPM("grass.ppm");
-	assert(grass_texture != NULL);
-
-	// create stone texture
-	// top bottom side
-	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
-		myImg.data[i] = (colour_t){75 + (rand()  % 12), 75 + (rand()  % 13), 75 + (rand()  % 5), };
-	}
-
-    writePPM("stone.ppm", &myImg);
-
-	stone_texture = readPPM("stone.ppm");
-	assert(stone_texture != NULL);
-	
-	// create dirt texture
-	// top bottom side
-	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
-		myImg.data[i] = (colour_t){150 + (rand() % 50), 75 + (rand() % 50), 10 + (rand() % 50), };
-	}
-
-    writePPM("dirt.ppm", &myImg);
-
-	dirt_texture = readPPM("dirt.ppm");
-	assert(dirt_texture != NULL);
-
-	// create wood texture
-	// * 3 for top bottom side of cube
-	// top
-	i = 0;
-	for (i; i < SQUARES_PER_FACE; i++) {
-		myImg.data[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50), };
-	}
-	// bottom
-	for (i; i < 2 * SQUARES_PER_FACE; i++) {
-		myImg.data[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50), };
-	}
-	// side
-	for (i; i < 3 * SQUARES_PER_FACE; i++) {
-		myImg.data[i] = (colour_t){90 + (rand() % 10), 60 + (rand() % 10), 50 + (rand() % 20), };
-	}
-
-    writePPM("wood.ppm", &myImg);
-
-	wood_texture = readPPM("wood.ppm");
-	assert(wood_texture != NULL);
-
-	// create leaf texture
-	// top bottom side
-	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
-		myImg.data[i] = (colour_t){5 - (rand()  % 5), 95 - (rand()  % 20), 7 - (rand()  % 7), };
-	}
-
-    writePPM("leaf.ppm", &myImg);
-
-    free(myImg.data);
-
-	leaf_texture = readPPM("leaf.ppm");
-	assert(leaf_texture != NULL);
+	return;
 }
 
 void update_chunks(int dir) {
+
 	switch (dir) {
 		case Z_POS: {
+			// move player index forward
 			occupied_chunk_index += 1;
 			if (occupied_chunk_index % SQRT_NUM_CHUNKS == 0) {
 				occupied_chunk_index -= SQRT_NUM_CHUNKS;
 			}
+			// take back chunks and move them to the front
 			for (int i = 0; i < NUM_CHUNKS; i++) {
 				if (camera_pos.z - chunks[i].pos.z > ((SQRT_NUM_CHUNKS / 2) + 1) * CHUNK_WIDTH * CUBE_WIDTH) {
 					chunks[i].pos.z += SQRT_NUM_CHUNKS * CUBE_WIDTH * CHUNK_WIDTH;
@@ -1952,6 +2073,7 @@ void update_chunks(int dir) {
 			break;
 		}
 		case Z_NEG: {
+			// etc
 			if (occupied_chunk_index % SQRT_NUM_CHUNKS == 0) {
 				occupied_chunk_index += SQRT_NUM_CHUNKS - 1;
 			}
@@ -1993,11 +2115,14 @@ void update_chunks(int dir) {
 			break;
 		}
 	}
+	return;
 }
 
 void generate_chunk(int chunk_i) {
+
 	chunk_t *chunk = &chunks[chunk_i];
 
+	// if no edit exists for this chunk, we will generate trees later
 	int edit_index = -1;
 	for (int i = 0; i < edits.count; i++) {
 		if (edits.items[i].pos.x == chunk->pos.x && edits.items[i].pos.z == chunk->pos.z) {
@@ -2011,17 +2136,30 @@ void generate_chunk(int chunk_i) {
 		for (int y = 0; y < CHUNK_WIDTH; y++) {
 			for (int z = 0; z < CHUNK_WIDTH; z++) {
 
+				// set this value for a certain smoothness of terrain from the perlin noise
 				float val = 0.00003;
-				int perlin_y = floor(((perlin2D(&noise, (chunk->pos.x + (x * CUBE_WIDTH)) * val, (chunk->pos.z + (z * CUBE_WIDTH)) * val)) * 10));
-				perlin_y += 5;
+				int perlin_y = floor(((perlin2D(&noise,
+									            (chunk->pos.x + (x * CUBE_WIDTH)) * val,
+												(chunk->pos.z + (z * CUBE_WIDTH)) * val)) * 10));
 
-				int right = floor(((perlin2D(&noise, (chunk->pos.x + (x * CUBE_WIDTH) + CUBE_WIDTH) * val, (chunk->pos.z + (z * CUBE_WIDTH)) * val)) * 10));
+				// check neighbours to cull neighbour faces
+				int right = floor(((perlin2D(&noise,
+									         (chunk->pos.x + (x * CUBE_WIDTH) + CUBE_WIDTH) * val,
+											 (chunk->pos.z + (z * CUBE_WIDTH)) * val)) * 10));
+				int left = floor(((perlin2D(&noise,
+									        (chunk->pos.x + (x * CUBE_WIDTH) - CUBE_WIDTH) * val,
+											(chunk->pos.z + (z * CUBE_WIDTH)) * val)) * 10));
+				int front = floor(((perlin2D(&noise,
+									         (chunk->pos.x + (x * CUBE_WIDTH)) * val,
+											 (chunk->pos.z + (z * CUBE_WIDTH) - CUBE_WIDTH) * val)) * 10));
+				int back = floor(((perlin2D(&noise,
+									        (chunk->pos.x + (x * CUBE_WIDTH)) * val,
+											(chunk->pos.z + (z * CUBE_WIDTH) + CUBE_WIDTH) * val)) * 10));
+
+				perlin_y += 5;
 				right += 5;
-				int left = floor(((perlin2D(&noise, (chunk->pos.x + (x * CUBE_WIDTH) - CUBE_WIDTH) * val, (chunk->pos.z + (z * CUBE_WIDTH)) * val)) * 10));
 				left += 5;
-				int front = floor(((perlin2D(&noise, (chunk->pos.x + (x * CUBE_WIDTH)) * val, (chunk->pos.z + (z * CUBE_WIDTH) - CUBE_WIDTH) * val)) * 10));
 				front += 5;
-				int back = floor(((perlin2D(&noise, (chunk->pos.x + (x * CUBE_WIDTH)) * val, (chunk->pos.z + (z * CUBE_WIDTH) + CUBE_WIDTH) * val)) * 10));
 				back += 5;
 
 				if (perlin_y < 0) {
@@ -2040,18 +2178,18 @@ void generate_chunk(int chunk_i) {
 					back = 0;
 				}
 
-				int cube_top = 0;
+				int cube_above = 0;
 				int cube_left = 0;
 				int cube_right = 0;
-				int cube_front = 0;
-				int cube_back = 0;
-				int cube_bottom = 1;
+				int cube_in_front = 0;
+				int cube_behind = 0;
+				int cube_below= 1;
 
 				if (front >= y) {
-					cube_front = 1;
+					cube_in_front = 1;
 				}
 				if (back >= y) {
-					cube_back = 1;
+					cube_behind = 1;
 				}
 				if (right >= y) {
 					cube_right = 1;
@@ -2059,7 +2197,7 @@ void generate_chunk(int chunk_i) {
 				if (left >= y) {
 					cube_left = 1;
 				}
-				cube_top = 0;
+				cube_above = 0;
 				
 				if (y > perlin_y) {
 					// air
@@ -2072,23 +2210,24 @@ void generate_chunk(int chunk_i) {
 				else if (y == 0) {
 					// stone
 					texture = stone_texture;
-					cube_top = 1;
+					cube_above = 1;
 				}
 				else {
 					// dirt
 					texture = dirt_texture;
-					cube_top = 1;
+					cube_above = 1;
 				}
 				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].texture = texture;
 				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].left_neighbour = cube_left;
 				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].right_neighbour = cube_right;
-				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].front_neighbour = cube_front;
-				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].back_neighbour = cube_back;
-				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].top_neighbour = cube_top;
-				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].bottom_neighbour = cube_bottom;
+				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].front_neighbour = cube_in_front;
+				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].back_neighbour = cube_behind;
+				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].top_neighbour = cube_above;
+				chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].bottom_neighbour = cube_below;
 			}
 		}
 	}
+
 	if (edit_index > -1) {
 		// apply the edits
 		for (int j = 0; j < edits.items[edit_index].count; j++) {
@@ -2103,73 +2242,126 @@ void generate_chunk(int chunk_i) {
 		}
 	}
 	else {
+
 		// generate some trees:
 		for (int x = 0; x < CHUNK_WIDTH; x++) {
 			for (int z = 0; z < CHUNK_WIDTH; z++) {
-				int found_air = 0;
 				for (int y = 0; y < CHUNK_WIDTH; y++) {
-					if (chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].texture == NULL) {
 
-						if (! found_air) {
-
-							// make a tree
-							if (rand() % 100 == 0) {
-								if (x < 2 || x > CHUNK_WIDTH - 2) {
-									continue;
-								}
-								if (z < 2 || z > CHUNK_WIDTH - 2) {
-									continue;
-								}
-								int max_h = 3 + rand() % 10;
-								if (y > CHUNK_WIDTH - max_h - 1) {
-									continue;
-								}
-								int h = 0;
-								int placed_log = 0;
-								for (h = 0; h < max_h; h++) {
-									if (h + 1 > CHUNK_WIDTH) {
-										break;
-									}
-									int i = (x + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-									placed_log = place_cube(chunk_i, i, wood_texture);
-									add_edit(chunk_i, i, wood_texture);
-								}
-
-								if (placed_log) {
-									h--;
-									int i = ((x + 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-									place_cube(chunk_i, i, leaf_texture);
-									add_edit(chunk_i, i, leaf_texture);
-
-									i = ((x - 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-									place_cube(chunk_i, i, leaf_texture);
-									add_edit(chunk_i, i, leaf_texture);
-
-									i = (x + ((y + h) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
-									place_cube(chunk_i, i, leaf_texture);
-									add_edit(chunk_i, i, leaf_texture);
-
-									i = (x + ((y + h) * CHUNK_WIDTH) + ((z - 1) * CHUNK_WIDTH * CHUNK_WIDTH));
-									place_cube(chunk_i, i, leaf_texture);
-									add_edit(chunk_i, i, leaf_texture);
-
-									i = (x + ((y + h + 1) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-									place_cube(chunk_i, i, leaf_texture);
-									add_edit(chunk_i, i, leaf_texture);
-								}
-							}
-
-						}
-						found_air = 1;
-
+					if (chunk->cubes[x + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH)].texture != NULL) {
+						continue;
 					}
+
+					// plant a tree at the first air cube
+					if (rand() % 100 != 0) {
+						break;
+					}
+
+					// check boundaries
+					if (x < 2 || x > CHUNK_WIDTH - 2) {
+						continue;
+					}
+					if (z < 2 || z > CHUNK_WIDTH - 2) {
+						continue;
+					}
+					int max_h = 3 + rand() % 10;
+					if (y > CHUNK_WIDTH - max_h - 1) {
+						continue;
+					}
+					int h = 0;
+					for (h = 0; h < max_h; h++) {
+						if (h + 1 > CHUNK_WIDTH) {
+							break;
+						}
+						int i = (x + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						place_cube(chunk_i, i, wood_texture);
+						add_edit(chunk_i, i, wood_texture);
+					}
+
+					h--;
+					int i = ((x + 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+					place_cube(chunk_i, i, leaf_texture);
+					add_edit(chunk_i, i, leaf_texture);
+
+					i = ((x - 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+					place_cube(chunk_i, i, leaf_texture);
+					add_edit(chunk_i, i, leaf_texture);
+
+					i = (x + ((y + h) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+					place_cube(chunk_i, i, leaf_texture);
+					add_edit(chunk_i, i, leaf_texture);
+
+					i = (x + ((y + h) * CHUNK_WIDTH) + ((z - 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+					place_cube(chunk_i, i, leaf_texture);
+					add_edit(chunk_i, i, leaf_texture);
+
+					i = (x + ((y + h + 1) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+					place_cube(chunk_i, i, leaf_texture);
+					add_edit(chunk_i, i, leaf_texture);
+
 				}
 			}
 		}
 	}
+	return;
 }
 
-//gpt perlin:
+void add_edit(int chunk_i, int cube_i, texture_t *texture) {
+
+	vec3_t chunk_pos = chunks[chunk_i].pos;
+
+	int edit_index = -1;
+	for (int i = 0; i < edits.count; i++) {
+		if (edits.items[i].pos.x == chunk_pos.x && edits.items[i].pos.z == chunk_pos.z) {
+			edit_index = i;
+			break;	
+		}
+	}
+
+	if (edit_index > -1) {
+		if (edits.items[edit_index].count == edits.items[edit_index].capacity) {
+			edits.items[edit_index].capacity *= 2;
+			edits.items[edit_index].cubes = realloc(edits.items[edit_index].cubes,
+					                                edits.items[edit_index].capacity * sizeof(edit_cube_t));
+		}
+		int count = edits.items[edit_index].count;
+
+		edits.items[edit_index].cubes[count].texture = texture;
+		edits.items[edit_index].cubes[count].cube_i = cube_i;
+		edits.items[edit_index].count++;
+	}
+	else {
+		edit_t new_edit;
+		new_edit.pos = chunk_pos;
+
+		new_edit.cubes = malloc(256 * sizeof(edit_cube_t));
+		new_edit.capacity = 256;
+		new_edit.cubes[0].texture = texture;
+		new_edit.cubes[0].cube_i = cube_i;
+		new_edit.count = 1;
+
+		if (edits.count == edits.capacity) {
+			edits.capacity *= 2;
+			edits.items = realloc(edits.items, edits.capacity * sizeof(edit_t)); 
+		}
+		edits.items[edits.count++] = new_edit;
+	}
+}
+
+void debug_log(char *str) {
+	printf("\n%s", str);
+	return;
+}
+
+void cleanup() {
+	for (int i = 0; i < edits.count; i++) {
+		free(edits.items[i].cubes);
+	}
+	free(edits.items);
+	return;
+}
+
+// gpt perlin:
 // Simple LCG random
 static uint32_t lcg(uint32_t *state) {
     *state = (*state * 1664525u + 1013904223u);
@@ -2233,261 +2425,63 @@ double perlin2D(perlin_t *n, double x, double y)
     );
 }
 
-int square_surrounds_centre(square_t *square) {
-	int left_x = WIDTH;
-	int right_x = -WIDTH;
-	int top_y = HEIGHT;
-	int bottom_y = -HEIGHT;
-	int count = 0;
-	for (int i = 0; i < 4; i++) {
-		if (square->coords[i].x < left_x) {
-			left_x = square->coords[i].x;
-		}	
-		if (square->coords[i].x > right_x) {
-			right_x = square->coords[i].x;
-		}	
-		if (square->coords[i].y > bottom_y) {
-			bottom_y = square->coords[i].y;
-		}
-		if (square->coords[i].y < top_y) {
-			top_y = square->coords[i].y;
-		}
-		if (square->coords[i].z < 0) {
-			count++;
-		}
+// gpt write and read ppm
+void writePPM(const char *filename, texture_t *img) {
+
+    FILE *fp = fopen(filename, "wb");
+    if (!fp) {
+		assert(0);
 	}
-	if (count == 4) {
-		return 0;
-	}
-	if (left_x <= WIDTH / 2 && right_x >= WIDTH / 2 && top_y <= HEIGHT / 2 && bottom_y >= HEIGHT / 2) {
-		return 1;
-	}
-	return 0;
+
+    fprintf(fp, "P6\n%d %d\n255\n", img->width, img->height);
+    
+    fwrite(img->data, 3, img->width * img->height, fp);
+    fclose(fp);
+
+	return;
 }
 
-void player_place_cube() {
-	vec3_t pos = {0};
+texture_t* readPPM(const char *filename) {
 
-	pos.x = chunks[highlighted_cube_chunk_index].pos.x + (highlighted_cube_index % CHUNK_WIDTH);
-	pos.y = chunks[highlighted_cube_chunk_index].pos.y + ((highlighted_cube_index / CHUNK_WIDTH) % CHUNK_WIDTH);
-	pos.z = chunks[highlighted_cube_chunk_index].pos.z + ((highlighted_cube_index / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH);
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) return NULL;
 
-	int diff = 0;
-	switch (highlighted_cube_face) {
-		case TOP: {
-			pos.y += CUBE_WIDTH;
-			diff = CHUNK_WIDTH;
-			break;
-		}
-		case FRONT: {
-			pos.z -= CUBE_WIDTH;
-			diff = - CHUNK_WIDTH * CHUNK_WIDTH;
-			break;
-		}
-		case LEFT: {
-			pos.x -= CUBE_WIDTH;
-			diff = -1;
-			break;
-		}
-		case BACK: {
-			pos.z += CUBE_WIDTH;
-			diff = CHUNK_WIDTH * CHUNK_WIDTH;
-			break;
-		}
-		case RIGHT: {
-			pos.x += CUBE_WIDTH;
-			diff = 1;
-			break;
-		}
-		case BOTTOM: {
-			pos.y -= CUBE_WIDTH;
-			diff = -CHUNK_WIDTH;
-			break;
-		}
-	}
-	int x1 = pos.x;
-	int y1 = pos.y;
-	int z1 = pos.z;
+    char header[3];
+    int width, height, maxVal;
 
-	// x2 = bottom right back
-	int x2 = x1 + CUBE_WIDTH;	
-	int y2 = y1 - CUBE_WIDTH;	
-	int z2 = z1 + CUBE_WIDTH;
+    if (fscanf(fp, "%2s", header) != 1 || strcmp(header, "P6") != 0) {
+        fclose(fp);
+        return NULL;
+    }
 
-	camera_pos.y -= CUBE_WIDTH;
-	// player_x1 = top left front
-	int player_x1 = camera_pos.x - player_width;
-	int player_y1 = camera_pos.y + player_height;
-	int player_z1 = camera_pos.z - player_width;
+    if (fscanf(fp, "%d %d", &width, &height) != 2) {
+        fclose(fp);
+        return NULL;
+    }
 
-	// player_x1 = bottom right back
-	int player_x2 = camera_pos.x + player_width;
-	int player_y2 = camera_pos.y - player_width;
-	int player_z2 = camera_pos.z + player_width;
+    if (fscanf(fp, "%d", &maxVal) != 1 || maxVal != 255) {
+        fclose(fp);
+        return NULL;
+    }
 
-	int x_collision = 0;
-	int y_collision = 0;
-	int z_collision = 0;
-	if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
-		// xs overlap
-		x_collision = 1;
-	}
-	if ((player_y1 <= y1 && player_y1 >= y2) || (player_y2 <= y1 && player_y2 >= y2)) {
-		// ys overlap
-		y_collision = 1;
-	}
-	if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
-		// zs overlap
-		z_collision = 1;
-	}
-	camera_pos.y += CUBE_WIDTH;
+    fgetc(fp);
 
-	texture_t *texture = grass_texture;
+    texture_t *img = malloc(sizeof(texture_t));
+    img->width = width;
+    img->height = height;
+    img->data = malloc(width * height * sizeof(colour_t));
 
-	if (x_collision && y_collision && z_collision) {
-		return;
-	}
-	switch (hotbar_selection) {
-		case 0: {
-			// grass
-			break;
-		}
-		case 1: {
-			texture = stone_texture;
-			break;
-		}
-		case 2: {
-			texture = wood_texture;
-			break;
-		}
-		case 3: {
-			texture = leaf_texture;
-			break;
-		}
-	}
-	int cube_i = highlighted_cube_index + diff;
-	place_cube(highlighted_cube_chunk_index, cube_i, texture);
-	add_edit(highlighted_cube_chunk_index, cube_i, texture);
-	return;	
-}
+    if (fread(img->data,
+              sizeof(colour_t),
+              width * height,
+              fp) != width * height) {
+        free(img->data);
+        free(img);
+        fclose(fp);
+        return NULL;
+    }
 
-void add_edit(int chunk_i, int cube_i, texture_t *texture) {
+    fclose(fp);
 
-	vec3_t chunk_pos = chunks[chunk_i].pos;
-
-	int edit_index = -1;
-	for (int i = 0; i < edits.count; i++) {
-		if (edits.items[i].pos.x == chunk_pos.x && edits.items[i].pos.z == chunk_pos.z) {
-			edit_index = i;
-			break;	
-		}
-	}
-
-	if (edit_index > -1) {
-		if (edits.items[edit_index].count == edits.items[edit_index].capacity) {
-			edits.items[edit_index].capacity *= 2;
-			edits.items[edit_index].cubes = realloc(edits.items[edit_index].cubes,
-					                                edits.items[edit_index].capacity * sizeof(edit_cube_t));
-		}
-		int count = edits.items[edit_index].count;
-
-		edits.items[edit_index].cubes[count].texture = texture;
-		edits.items[edit_index].cubes[count].cube_i = cube_i;
-		edits.items[edit_index].count++;
-	}
-	else {
-		edit_t new_edit;
-		new_edit.pos = chunk_pos;
-
-		new_edit.cubes = malloc(256 * sizeof(edit_cube_t));
-		new_edit.capacity = 256;
-		new_edit.cubes[0].texture = texture;
-		new_edit.cubes[0].cube_i = cube_i;
-		new_edit.count = 1;
-
-		if (edits.count == edits.capacity) {
-			edits.capacity *= 2;
-			edits.items = realloc(edits.items, edits.capacity * sizeof(edit_t)); 
-		}
-		edits.items[edits.count++] = new_edit;
-	}
-}
-
-void set_fog_level(colour_t *c, float fog_r) {
-		if (fog_r > FOG_DIST) {
-			float val = fog_r - FOG_DIST;
-			val = (val * 100) / FOG_MAX;
-			if (val > 100) {
-				val = 100;
-			}
-			c->r += (((float)sky.r - (float)c->r) / 100) * val;
-			c->g += (((float)sky.g - (float)c->g) / 100) * val;
-			c->b += (((float)sky.b - (float)c->b) / 100) * val;
-		}
-}
-
-void set_light_level(colour_t *c, float fog_r) {
-		float val = 1.0f / (fog_r * 0.001);
-		val += day_cycle / max_day_cycle;
-		if (val > 1) {
-			val = 1;
-		}
-		float r = ((float)c->r) * val;
-		float g = ((float)c->g) * val;
-		float b = ((float)c->b) * val;
-		if (r < 0) {
-			r == 0;
-		}
-		else if (r > c->r) {
-			r = c->r;
-		}
-		if (g < 0) {
-			g == 0;
-		}
-		else if (g > c->g) {
-			g = c->g;
-		}
-		if (b < 0) {
-			b == 0;
-		}
-		else if (b > c->b) {
-			b = c->b;
-		}
-		c->r = (char) r;
-		c->g = (char) g;
-		c->b = (char) b;
-}
-
-void update_day_cycle() {
-	if (night) {
-		if (frame % cycle_frame_interval == 0 && day_cycle < max_day_cycle) {
-			day_cycle += 1;
-		}	
-		if (day_cycle == max_day_cycle) {
-			if (frame % cycle_frame_interval == 0) {
-				night += 1;
-			}
-			if (night == night_length) {
-				night = 0;
-				day = 1;
-			}
-		}
-	}
-	if (day) {
-		if (frame % cycle_frame_interval == 0 && day_cycle > 0) {
-			day_cycle -= 1;
-		}	
-		if (day_cycle == 0) {
-			if (frame % cycle_frame_interval == 0) {
-				day += 1;
-			}
-			if (day == night_length) {
-				day = 0;
-				night = 1;
-			}
-		}
-	}
-	sky.r = (char)((float)max_sky.r * (day_cycle / max_day_cycle));
-	sky.g = (char)((float)max_sky.g * (day_cycle / max_day_cycle));
-	sky.b = (char)((float)max_sky.b * (day_cycle / max_day_cycle));
+    return img;
 }

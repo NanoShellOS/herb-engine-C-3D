@@ -131,7 +131,7 @@ int main() {
 			}
 		}
 
-		if (hold_mouse) {
+		if (holding_mouse) {
 			// handle the mouse: 
 			if (! mouse_defined) {
 				XDefineCursor(display, window, cursor);
