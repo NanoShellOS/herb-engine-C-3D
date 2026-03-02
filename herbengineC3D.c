@@ -9,10 +9,6 @@
 
 /* -------------------------- TODO list -------------------------- */
 
-// split render_chunks function, and then use it to render hand and hotbar
-
-// fix hotbar UI
-
 // fix collision issue where you get stuck in a block at a chunk boundary
 // fix rendering issue when some points have -z the square draws rlly big on screen
 
@@ -202,7 +198,6 @@ static void draw_rect(vec3_t top_left, int width, int height, colour_t colour);
 static void draw_all_faces();
 
 static void draw_cursor();
-static void draw_hotbar();
 static void draw_hand();
 
 static uint32_t pack_colour_to_uint32(colour_t *colour);
@@ -276,6 +271,7 @@ static int sprint_speed;
 static int gravity;
 static int jump_amount;
 static int jump_height;
+static int can_jump;
 
 // physics
 static float day_cycle;
@@ -303,6 +299,8 @@ static int last_space_frame;
 static int space_to_fly_frame_interval;
 static int flying;
 
+static int hotbar_selection;
+
 // drawing
 static uint32_t *pixels = NULL;
 
@@ -313,9 +311,6 @@ static colour_t blue = {0};
 static colour_t sky = {0};
 static colour_t max_sky = {0};
 
-static colour_t hotbar_colour = {0};
-
-static face_t hotbar_faces[HOTBAR_SLOTS * 6];
 static face_t hand_grass_faces[6];
 static face_t hand_stone_faces[6];
 static face_t hand_wood_faces[6];
@@ -325,11 +320,6 @@ static face_t hand_water_faces[6];
 static vec3_t hand_pos = {0};
 static int hand_index;
 
-static int hotbar_y;
-static int hotbar_x;
-static int hotbar_width; 
-static int hotbar_height;
-static int hotbar_selection;
 static int small_height;
 
 // rendering
@@ -390,6 +380,7 @@ void init_stuff() {
 	sprint_speed = speed * 1.5;
 
 	jump_height = 2.5 * CUBE_WIDTH;
+	can_jump = 0;
 	gravity = - CUBE_WIDTH / 6;
 
 	// - physics
@@ -407,25 +398,9 @@ void init_stuff() {
 	last_space_frame = -100;
 	space_to_fly_frame_interval = 20;
 	flying = 0;
+	hotbar_selection = 0;
 
 	// - drawing
-	hotbar_colour.r = 50;
-	hotbar_colour.g = 50;
-	hotbar_colour.b = 50;
-
-	hotbar_y = HEIGHT - (HEIGHT * 0.1);
-	hotbar_x = HOTBAR_SLOT_WIDTH;
-	hotbar_width = HOTBAR_SLOT_WIDTH * 9; 
-	hotbar_height = HOTBAR_SLOT_WIDTH;
-	hotbar_selection = 0;
-	small_height = HEIGHT * 0.01;
-
-	// - rendering
-	generate_textures();
-
-	draw_faces.count = 0;
-	highlighted_cube_face = -1;
-
 	red.r = 255;
 	green.g = 255;
 	blue.b = 255;
@@ -438,8 +413,12 @@ void init_stuff() {
 	sky.g = 0;
 	sky.b = 0;
 
-	vec3_t pos = {1000, 0, 1000};
-	//render_cube_to_faces_array(grass_texture, pos, hotbar_faces, 0);
+
+	// - rendering
+	generate_textures();
+
+	draw_faces.count = 0;
+	highlighted_cube_face = -1;
 
 	hand_pos.x = -2000;
 	hand_pos.y = -600;
@@ -575,6 +554,7 @@ int player_inside_cube(vec3_t cube_top_left_front_pos) {
 	if (x_collision && y_collision && z_collision) {
 		if (possibly_hit_ground) {
 			flying = 0;
+			can_jump = 1;
 		}
 
 		// make the player 2 cubes tall:
@@ -645,8 +625,9 @@ void handle_input() {
 		if (flying) {
 			y_movement += speed;
 		}
-	    else if (! jump_amount) {
+	    else if ((! jump_amount) && can_jump) {
 			jump_amount = jump_height;
+			can_jump = 0;
 		}
 		space_was_pressed = 1;
 	}
@@ -845,7 +826,6 @@ void update_pixels() {
 
 	draw_cursor();
 	draw_hand();
-	//draw_hotbar();
 
 	return;
 }
@@ -1093,55 +1073,6 @@ void draw_cursor() {
 	return;
 }
 
-void draw_hotbar() {
-	int x = hotbar_x;
-	int y = hotbar_y;
-
-	int w = hotbar_width;
-	int h = hotbar_height;
-    draw_rect((vec3_t){x, y, 1}, w, small_height, hotbar_colour);
-	y -= h;
-    draw_rect((vec3_t){x, y, 1}, w, small_height, hotbar_colour);
-
-    draw_rect((vec3_t){x, y, 1}, small_height, h, hotbar_colour);
-	x += w;
-    draw_rect((vec3_t){x, y, 1}, small_height, h, hotbar_colour);
-
-	switch(hotbar_selection) {
-		case 0: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 0), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 1: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 1), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 2: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 2), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 3: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 3), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 4: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 4), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-		case 5: {
-			draw_rect((vec3_t){hotbar_x + (HOTBAR_SLOT_WIDTH * 5), hotbar_y - hotbar_height, 1}, HOTBAR_SLOT_WIDTH, hotbar_height, hotbar_colour);
-			break;
-		}
-	}
-
-	for (int i = 0; i < 6 * HOTBAR_SLOTS; i++) {
-		for (int j = 0; j < SQUARES_PER_FACE; j++) {
-			fill_square(&hotbar_faces[i].squares[j]);
-		}
-	}
-	return;
-}
-
 void draw_hand() {
 	face_t *faces;
 	switch (hand_index) {
@@ -1162,7 +1093,7 @@ void draw_hand() {
 			break;
 		}
 		case 4: {
-			faces = hand_stone_faces;
+			faces = hand_sand_faces;
 			break;
 		}
 		case 5: {
