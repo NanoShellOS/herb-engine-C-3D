@@ -33,7 +33,7 @@
 // this should be odd for the best effect - 
 // this way the player will be in a central chunk at all times
 // as the chunks are layed out in a square
-#define SQRT_NUM_CHUNKS 7
+#define SQRT_NUM_CHUNKS 5
 
 #define NUM_CHUNKS (SQRT_NUM_CHUNKS * SQRT_NUM_CHUNKS)
 #define CHUNK_WIDTH 16
@@ -190,6 +190,8 @@ static void player_remove_cube();
 
 static int place_cube(int chunk_i, int cube_i, texture_t *texture);
 static void remove_cube(int chunk_i, int cube_i);
+
+static void generate_cube(int chunk_i, int cube_i, texture_t *texture);
 
 // chunks
 static void build_world();
@@ -1694,6 +1696,13 @@ void render_hand() {
 }
 
 /* ------------------------------- cube handling ------------------------------- */
+void generate_cube(int chunk_i, int cube_i, texture_t *texture) {
+	if (place_cube(chunk_i, cube_i, texture)) {
+		save_chunk_edit(chunk_i, cube_i, texture);
+	}
+	return;
+}
+
 int place_cube(int chunk_i, int cube_i, texture_t *texture) {
 	if (cube_i >= CUBES_PER_CHUNK) {
 		return -1;
@@ -2243,51 +2252,105 @@ void generate_chunk(int chunk_i) {
 					}
 
 					// plant a tree at the first air cube
-					if (rand() % 100 != 0) {
-						break;
-					}
-
-					// check boundaries
-					if (x < 2 || x > CHUNK_WIDTH - 2) {
-						continue;
-					}
-					if (z < 2 || z > CHUNK_WIDTH - 2) {
-						continue;
-					}
-					int max_h = 3 + rand() % 10;
-					if (y > CHUNK_WIDTH - max_h - 1) {
-						continue;
-					}
-					int h = 0;
-					for (h = 0; h < max_h; h++) {
-						if (h + 1 > CHUNK_WIDTH) {
-							break;
+					if (rand() % 100 == 0) {
+						// check boundaries
+						if (x < 2 || x > CHUNK_WIDTH - 2) {
+							continue;
 						}
-						int i = (x + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-						place_cube(chunk_i, i, wood_texture);
-						save_chunk_edit(chunk_i, i, wood_texture);
+						if (z < 2 || z > CHUNK_WIDTH - 2) {
+							continue;
+						}
+						int max_h = 3 + rand() % 10;
+						if (y > CHUNK_WIDTH - max_h - 1) {
+							continue;
+						}
+						int h = 0;
+						for (h = 0; h < max_h; h++) {
+							if (h + 1 > CHUNK_WIDTH) {
+								break;
+							}
+							int i = (x + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+							generate_cube(chunk_i, i, wood_texture);
+						}
+
+						h--;
+						int i = ((x + 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+
+						i = ((x - 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+
+						i = (x + ((y + h) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+
+						i = (x + ((y + h) * CHUNK_WIDTH) + ((z - 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+
+						i = (x + ((y + h + 1) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+
 					}
+					else if (rand() % 5000 == 0) {
+						// check boundaries
+						if (x < 4 || x > CHUNK_WIDTH - 4) {
+							continue;
+						}
+						if (z < 4 || z > CHUNK_WIDTH - 4) {
+							continue;
+						}
+						if (y > CHUNK_WIDTH - 4) {
+							continue;
+						}
 
-					h--;
-					int i = ((x + 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-					place_cube(chunk_i, i, leaf_texture);
-					save_chunk_edit(chunk_i, i, leaf_texture);
+						for (int j = 0; j < 5; j++) {
+							int i = (x + j + (y * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+							generate_cube(chunk_i, i, stone_texture);
 
-					i = ((x - 1) + ((y + h) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-					place_cube(chunk_i, i, leaf_texture);
-					save_chunk_edit(chunk_i, i, leaf_texture);
+							i = (x + j + (y * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+							generate_cube(chunk_i, i, stone_texture);
 
-					i = (x + ((y + h) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
-					place_cube(chunk_i, i, leaf_texture);
-					save_chunk_edit(chunk_i, i, leaf_texture);
+							i = (x + j + ((y + 1) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+							generate_cube(chunk_i, i, stone_texture);
 
-					i = (x + ((y + h) * CHUNK_WIDTH) + ((z - 1) * CHUNK_WIDTH * CHUNK_WIDTH));
-					place_cube(chunk_i, i, leaf_texture);
-					save_chunk_edit(chunk_i, i, leaf_texture);
+							i = (x + j + ((y + 1) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+							generate_cube(chunk_i, i, stone_texture);
 
-					i = (x + ((y + h + 1) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
-					place_cube(chunk_i, i, leaf_texture);
-					save_chunk_edit(chunk_i, i, leaf_texture);
+							i = (x + j + (y * CHUNK_WIDTH) + ((z - 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+							generate_cube(chunk_i, i, stone_texture);
+						}
+
+						int i = (x + 1 + ((y + 2) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+						i = (x + 1 + ((y + 3) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+						i = (x + 1 + ((y + 2) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+
+						i = (x + 2 + ((y + 2) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+						i = (x + 2 + ((y + 1) * CHUNK_WIDTH) + ((z - 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+
+						i = (x + 3 + ((y + 2) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, leaf_texture);
+						i = (x + 3 + ((y + 3) * CHUNK_WIDTH) + (z * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+						i = (x + 3 + ((y + 2) * CHUNK_WIDTH) + ((z + 1) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+
+						i = (x + 1 + (y * CHUNK_WIDTH) + ((z - 2) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+						i = (x + 3 + (y * CHUNK_WIDTH) + ((z - 2) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+
+						i = (x + 1 + (y * CHUNK_WIDTH) + ((z + 2) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+						i = (x + 2 + (y * CHUNK_WIDTH) + ((z + 2) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+						i = (x + 3 + (y * CHUNK_WIDTH) + ((z + 2) * CHUNK_WIDTH * CHUNK_WIDTH));
+						generate_cube(chunk_i, i, stone_texture);
+					}
+					break;
 
 				}
 			}
