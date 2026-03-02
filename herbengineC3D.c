@@ -214,40 +214,40 @@ static double perlin2D(perlin_t *n, double x, double y);
 
 struct timespec last, now;
 
-static int paused = 0;
-static int frame = 0;
+static int paused;
+static int frame;
 
 // player
 static vec3_t player_pos = {0};
 
-static int player_width = 0;
-static int player_height = 0;
+static int player_width;
+static int player_height;
 
-static int speed = 0;
-static int walk_speed = 0;
-static int sprint_speed = 0;
+static int speed;
+static int walk_speed;
+static int sprint_speed;
 
-static int gravity = 0;
-static int jump_amount = 0;
-static int jump_height = 0;
+static int gravity;
+static int jump_amount;
+static int jump_height;
 
 // physics
-static float day_cycle = 0;
-static float max_day_cycle = 0;
-static int cycle_frame_interval = 0;
-static float night_length = 0;
-static int day = 0;
-static int night = 0;
+static float day_cycle;
+static float max_day_cycle;
+static int cycle_frame_interval;
+static float night_length;
+static int day;
+static int night;
 
 // input
 static vec2_t mouse = {0};
-static float mouse_sensitivity = 0;
-static int mouse_left_click = 0;
-static int mouse_was_left_clicked = 0;
-static int mouse_right_click = 0;
-static int mouse_was_right_clicked = 0;
-static int holding_mouse = 1;
-static int mouse_defined = 0;
+static float mouse_sensitivity;
+static int mouse_left_click;
+static int mouse_was_left_clicked;
+static int mouse_right_click;
+static int mouse_was_right_clicked;
+static int holding_mouse;
+static int mouse_defined;
 
 static int keys[256] = {0};
 static unsigned char w, a, s, d, shift, space, control, escape;
@@ -265,30 +265,30 @@ static colour_t max_sky = {0};
 
 static colour_t hotbar_colour = {0};
 
-static int hotbar_y = 0;
-static int hotbar_x = 0;
-static int hotbar_width = 0; 
-static int hotbar_height = 0;
-static int hotbar_selection = 0;
-static int small_height = 0;
+static int hotbar_y;
+static int hotbar_x;
+static int hotbar_width; 
+static int hotbar_height;
+static int hotbar_selection;
+static int small_height;
 
 // rendering
-static float x_rotation = 0;
-static float y_rotation = 0;
+static float x_rotation;
+static float y_rotation;
 
-static float sine_x_rotation = 0;
-static float sine_y_rotation = 0;
-static float cos_x_rotation = 0;
-static float cos_y_rotation = 0;
+static float sine_x_rotation;
+static float sine_y_rotation;
+static float cos_x_rotation;
+static float cos_y_rotation;
 static faces_t draw_faces = {0};
 
-static int highlighted_cube_face = 0;
-static int highlighted_cube_index = 0;
-static int highlighted_cube_chunk_index = 0;
+static int highlighted_cube_face;
+static int highlighted_cube_index;
+static int highlighted_cube_chunk_index;
 
 // chunks
 static chunk_t chunks[NUM_CHUNKS] = {0};
-static int occupied_chunk_index = 0;
+static int occupied_chunk_index;
 static chunk_edits_t chunk_edits = {0};
 
 // textures
@@ -772,6 +772,13 @@ void fill_square(square_t *square) {
 		return;
 	}
 
+	if (smallest_y < 0) {
+		smallest_y = 0;
+	}
+	if (largest_y > HEIGHT) {
+		largest_y = HEIGHT;
+	}
+
 	int left_start_index = smallest_y_index;
 	int left_end_index = smallest_y_index - 1;
 	if (left_end_index == -1) {
@@ -781,34 +788,22 @@ void fill_square(square_t *square) {
 	int right_start_index = smallest_y_index;
 	int right_end_index = (smallest_y_index + 1) % 4;
 
-	int left_x = square->coords[left_start_index].x;
-	int left_y = square->coords[left_start_index].y;
-
-	int right_x = left_x;
-	int right_y = right_x;
-	if (smallest_y < 0) {
-		smallest_y = 0;
-	}
-	if (largest_y > HEIGHT) {
-		largest_y = HEIGHT;
-	}
+	int left_x, right_x;
+	int x1, x2, y1, y2;
 
 	for (int y = smallest_y; y < largest_y; y++) {
 		uint32_t* row = &pixels[y * WIDTH];
 
 		// get x coords y using y = mx + c
 
- 		// y1 = square->coords[left_start_index].y;
- 		// y2 = square->coords[left_end_index].y;
- 		// x1 = square->coords[left_start_index].x;
- 		// x2 = square->coords[left_end_index].x;
+ 		x1 = square->coords[left_start_index].x;
+ 		x2 = square->coords[left_end_index].x;
 
-		// left_x = x1 + (((y - y1) * (x2 - x1)) / (y2 - y1));
+ 		y1 = square->coords[left_start_index].y;
+ 		y2 = square->coords[left_end_index].y;
 
 		// if ((y2 - y1) == 0) the draw the line, and move on to the next left line
-		if ((square->coords[left_end_index].y - square->coords[left_start_index].y) == 0) {
-			int x1 = square->coords[left_start_index].x;
-			int x2 = square->coords[left_end_index].x;
+		if ((y2 - y1) == 0) {
 			if (x2 > x1) {
 				if (x1 < 0) {
 					x1 = 0;
@@ -839,11 +834,15 @@ void fill_square(square_t *square) {
 			continue;
 		}
 
-		left_x = square->coords[left_start_index].x + (((y - square->coords[left_start_index].y) * (square->coords[left_end_index].x - square->coords[left_start_index].x)) / (square->coords[left_end_index].y - square->coords[left_start_index].y));
+		left_x = x1 + (((y - y1) * (x2 - x1)) / (y2 - y1));
+
+ 		x1 = square->coords[right_start_index].x;
+ 		x2 = square->coords[right_end_index].x;
+
+ 		y1 = square->coords[right_start_index].y;
+ 		y2 = square->coords[right_end_index].y;
 			
-		if ((square->coords[right_end_index].y - square->coords[right_start_index].y) == 0) {
-			int x1 = square->coords[right_start_index].x;
-			int x2 = square->coords[right_end_index].x;
+		if ((y2 - y1) == 0) {
 			if (x2 > x1) {
 				if (x1 < 0) {
 					x1 = 0;
@@ -871,8 +870,9 @@ void fill_square(square_t *square) {
 			continue;
 		}
 
-		right_x = square->coords[right_start_index].x + (((y - square->coords[right_start_index].y) * (square->coords[right_end_index].x - square->coords[right_start_index].x)) / (square->coords[right_end_index].y - square->coords[right_start_index].y));
+		right_x = x1 + (((y - y1) * (x2 - x1)) / (y2 - y1));
 
+		// check if either line is finished and move on to the next line
 		if (y >= square->coords[left_end_index].y) {
 
 			left_start_index = left_end_index;
@@ -887,7 +887,7 @@ void fill_square(square_t *square) {
 			right_end_index = (right_end_index + 1) % 4;
 		}
 
-		// connect left x and right x
+		// fill in between left x and right x
 		if (right_x > left_x) {
 			if (left_x <= 0) {
 				left_x = 0;
