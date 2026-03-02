@@ -9,7 +9,13 @@
 
 /* -------------------------- TODO list -------------------------- */
 
-// be able to switch between flying or jumping
+// swap x and z for frog or easter island statue so they can rotate
+
+// macros for accesing chunk or cube i
+
+// make collision checking per cube, then use it in player_place_cube
+
+// split render_chunks function, and then use it to render hand and hotbar
 
 // fix hotbar and hand UI
 
@@ -255,6 +261,10 @@ static int mouse_defined;
 static int keys[256] = {0};
 static unsigned char w, a, s, d, shift, space, control, escape;
 static unsigned char one, two, three, four, five, six, seven, eight, nine;
+static int space_was_pressed;
+static int last_space_frame;
+static int space_to_fly_frame_interval;
+static int flying;
 
 // drawing
 static uint32_t *pixels = NULL;
@@ -345,6 +355,11 @@ void init_stuff() {
 	// - input
 	holding_mouse = 1;
 	mouse_sensitivity = 0.005f;
+
+	space_was_pressed = 0;
+	last_space_frame = -100;
+	space_to_fly_frame_interval = 20;
+	flying = 1;
 
 	// - drawing
 	hotbar_colour.r = 50;
@@ -488,19 +503,27 @@ int collided() {
 		int y_collision = 0;
 		int z_collision = 0;
 
+		int possibly_hit_ground = 0;
 		if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
 			// xs overlap
 			x_collision = 1;
 		}
-		if ((player_y1 <= y1 && player_y1 >= y2) || (player_y2 <= y1 && player_y2 >= y2)) {
+		if (player_y1 <= y1 && player_y1 >= y2) {
 			// ys overlap
 			y_collision = 1;
+		}
+		if (player_y2 <= y1 && player_y2 >= y2) {
+			y_collision = 1;
+			possibly_hit_ground = 1;
 		}
 		if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
 			// zs overlap
 			z_collision = 1;
 		}
 		if (x_collision && y_collision && z_collision) {
+			if (possibly_hit_ground) {
+				flying = 0;
+			}
 			return 1;
 		}
 	}
@@ -542,26 +565,46 @@ void handle_input() {
 	}
 
     if (keys[space]) {
-		if (! jump_amount) {
+		if (flying) {
+			y_movement += speed;
+		}
+	    else if (! jump_amount) {
 			jump_amount = jump_height;
 		}
-		//y_movement += speed;
+		space_was_pressed = 1;
+	}
+	else {
+		if (space_was_pressed) {
+
+			if (frame - last_space_frame < space_to_fly_frame_interval) {
+				flying = 1;	
+				jump_amount = 0;
+			}
+
+
+			last_space_frame = frame;
+			space_was_pressed = 0;
+		}
 	}
     if (keys[shift]) {
-        y_movement += - speed;
+		if (flying) {
+			y_movement += - speed;
+		}
 	}
 
 	if (keys[escape]) {
 		holding_mouse = 0;
 	}
 
-	y_movement += gravity;
-	y_movement += jump_amount / 5;
-	if (jump_amount > 0) {
-		jump_amount -= (jump_height * 0.04);
-	}
-	else {
-		jump_amount = 0;
+	if (! flying) {
+		y_movement += gravity;
+		y_movement += jump_amount / 5;
+		if (jump_amount > 0) {
+			jump_amount -= (jump_height * 0.04);
+		}
+		else {
+			jump_amount = 0;
+		}
 	}
 
 	// make the player 2 cubes tall:
@@ -1438,60 +1481,6 @@ void render_chunks() {
 		}
 	}
 
-	// check if cube highlighted is at a chunk edge
-	int x = (highlighted_cube_index % CHUNK_WIDTH);
-	int y = ((highlighted_cube_index / CHUNK_WIDTH) % CHUNK_WIDTH);
-	int z = ((highlighted_cube_index / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH);
-
-	// if it is, need to make sure we have the right chunk and cube index
-	// as if the cube we're looking at is in the chunk to the right,
-	// and we're looking at the left side of the cube,
-	// highlighted_chunk_i will need to be the index of the chunk to the left of that,
-	// and highlighted_cube_i will need to be the right most cube in that chunk etc
-	if (x == 0) {
-		if (highlighted_cube_face == LEFT) {
-			int left_chunk_i = highlighted_cube_chunk_index - SQRT_NUM_CHUNKS;
-			if (left_chunk_i < 0) {
-				left_chunk_i += NUM_CHUNKS;
-			}
-			highlighted_cube_chunk_index = left_chunk_i;
-			highlighted_cube_index += CHUNK_WIDTH;
-		}
-	}
-	else if (x == CHUNK_WIDTH - 1) {
-		if (highlighted_cube_face == RIGHT) {
-			int right_chunk_i = highlighted_cube_chunk_index + SQRT_NUM_CHUNKS;	
-			if (right_chunk_i > (NUM_CHUNKS - 1)) {
-				right_chunk_i -= NUM_CHUNKS;
-			}
-			highlighted_cube_chunk_index = right_chunk_i;
-			highlighted_cube_index -= CHUNK_WIDTH;
-		}
-	}
-	if (z == 0) {
-		if (highlighted_cube_face == FRONT) {
-			int in_front_chunk_i = highlighted_cube_chunk_index;
-			if (in_front_chunk_i % SQRT_NUM_CHUNKS == 0) {
-				in_front_chunk_i += SQRT_NUM_CHUNKS - 1;
-			}
-			else {
-				in_front_chunk_i -= 1;
-			}
-			highlighted_cube_chunk_index = in_front_chunk_i;
-			highlighted_cube_index += (CHUNK_WIDTH) * CHUNK_WIDTH * CHUNK_WIDTH;
-		}
-	}
-	else if (z == CHUNK_WIDTH - 1) {
-		if (highlighted_cube_face == BACK) {
-			int behind_chunk_i = highlighted_cube_chunk_index + 1;
-			if (behind_chunk_i % SQRT_NUM_CHUNKS == 0) {
-				behind_chunk_i -= SQRT_NUM_CHUNKS;
-			}
-			highlighted_cube_chunk_index = behind_chunk_i;
-			highlighted_cube_index -= (CHUNK_WIDTH) * CHUNK_WIDTH * CHUNK_WIDTH;
-		}
-	}
-
 	// sort the faces based on their distance to the camera
 	qsort(draw_faces.items, draw_faces.count, sizeof(face_t), compare_faces);
 	return;
@@ -1975,6 +1964,61 @@ void remove_cube(int chunk_i, int cube_i) {
 }
 
 void player_place_cube() {
+
+	// check if cube highlighted is at a chunk edge
+	int x = (highlighted_cube_index % CHUNK_WIDTH);
+	int y = ((highlighted_cube_index / CHUNK_WIDTH) % CHUNK_WIDTH);
+	int z = ((highlighted_cube_index / (CHUNK_WIDTH * CHUNK_WIDTH)) % CHUNK_WIDTH);
+
+	// if it is, need to make sure we have the right chunk and cube index
+	// as if the cube we're looking at is in the chunk to the right,
+	// and we're looking at the left side of the cube,
+	// highlighted_chunk_i will need to be the index of the chunk to the left of that,
+	// and highlighted_cube_i will need to be the right most cube in that chunk etc
+	if (x == 0) {
+		if (highlighted_cube_face == LEFT) {
+			int left_chunk_i = highlighted_cube_chunk_index - SQRT_NUM_CHUNKS;
+			if (left_chunk_i < 0) {
+				left_chunk_i += NUM_CHUNKS;
+			}
+			highlighted_cube_chunk_index = left_chunk_i;
+			highlighted_cube_index += CHUNK_WIDTH;
+		}
+	}
+	else if (x == CHUNK_WIDTH - 1) {
+		if (highlighted_cube_face == RIGHT) {
+			int right_chunk_i = highlighted_cube_chunk_index + SQRT_NUM_CHUNKS;	
+			if (right_chunk_i > (NUM_CHUNKS - 1)) {
+				right_chunk_i -= NUM_CHUNKS;
+			}
+			highlighted_cube_chunk_index = right_chunk_i;
+			highlighted_cube_index -= CHUNK_WIDTH;
+		}
+	}
+	if (z == 0) {
+		if (highlighted_cube_face == FRONT) {
+			int in_front_chunk_i = highlighted_cube_chunk_index;
+			if (in_front_chunk_i % SQRT_NUM_CHUNKS == 0) {
+				in_front_chunk_i += SQRT_NUM_CHUNKS - 1;
+			}
+			else {
+				in_front_chunk_i -= 1;
+			}
+			highlighted_cube_chunk_index = in_front_chunk_i;
+			highlighted_cube_index += (CHUNK_WIDTH) * CHUNK_WIDTH * CHUNK_WIDTH;
+		}
+	}
+	else if (z == CHUNK_WIDTH - 1) {
+		if (highlighted_cube_face == BACK) {
+			int behind_chunk_i = highlighted_cube_chunk_index + 1;
+			if (behind_chunk_i % SQRT_NUM_CHUNKS == 0) {
+				behind_chunk_i -= SQRT_NUM_CHUNKS;
+			}
+			highlighted_cube_chunk_index = behind_chunk_i;
+			highlighted_cube_index -= (CHUNK_WIDTH) * CHUNK_WIDTH * CHUNK_WIDTH;
+		}
+	}
+
 	vec3_t pos = {0};
 
 	pos.x = chunks[highlighted_cube_chunk_index].pos.x + (highlighted_cube_index % CHUNK_WIDTH);
@@ -2290,7 +2334,8 @@ void generate_chunk(int chunk_i) {
 						generate_cube(chunk_i, i, leaf_texture);
 
 					}
-					else if (rand() % 7000 == 0) {
+					else if (rand() % 6000 == 0) {
+						// frog statue
 						// check boundaries
 						if (x < 4 || x > CHUNK_WIDTH - 4) {
 							continue;
@@ -2350,7 +2395,8 @@ void generate_chunk(int chunk_i) {
 						i = (x + 3 + (y * CHUNK_WIDTH) + ((z + 2) * CHUNK_WIDTH * CHUNK_WIDTH));
 						generate_cube(chunk_i, i, stone_texture);
 					}
-					else if (rand() % 10000 == 0) {
+					else if (rand() % 9000 == 0) {
+						// obelisk
 						// check boundaries
 						if (x < 4 || x > CHUNK_WIDTH - 4) {
 							continue;
@@ -2371,7 +2417,8 @@ void generate_chunk(int chunk_i) {
 							}
 						}
 					}
-					else if (rand() % 4000 == 0) {
+					else if (rand() % 3000 == 0) {
+						// easter island statue
 						// check boundaries
 						if (x < 4 || x > CHUNK_WIDTH - 4) {
 							continue;
