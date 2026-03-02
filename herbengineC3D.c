@@ -9,8 +9,6 @@
 
 /* -------------------------- TODO list -------------------------- */
 
-// make collision checking per cube, then use it in player_place_cube
-
 // split render_chunks function, and then use it to render hand and hotbar
 
 // fix hotbar and hand UI
@@ -187,6 +185,7 @@ static void cleanup();
 static void debug_log(char *str);
 
 // physics
+static int player_inside_cube(vec3_t cube_top_left_front_pos);
 static int collided();
 static void update_day_cycle();
 
@@ -355,6 +354,8 @@ texture_t *water_texture = NULL;
 // gpt perlin noise
 static perlin_t noise;
 
+static int bruh;
+
 /* -------------------------- funciton definitions -------------------------- */
 
 void init_stuff() {
@@ -509,6 +510,72 @@ void update_day_cycle() {
 	return;
 }
 
+int player_inside_cube(vec3_t cube_top_left_front_pos) {
+	// x1 = top left front
+	int x1 = cube_top_left_front_pos.x;
+	int y1 = cube_top_left_front_pos.y;
+	int z1 = cube_top_left_front_pos.z;
+
+	// x2 = bottom right back
+	int x2 = x1 + CUBE_WIDTH;	
+	int y2 = y1 - CUBE_WIDTH;	
+	int z2 = z1 + CUBE_WIDTH;
+
+	// player_x1 = top left front
+	int player_x1 = player_pos.x - player_width;
+	int player_y1 = player_pos.y + player_height;
+	int player_z1 = player_pos.z - player_width;
+
+	// player_x1 = bottom right back
+	int player_x2 = player_pos.x + player_width;
+	int player_y2 = player_pos.y - player_width;
+	int player_z2 = player_pos.z + player_width;
+
+	int x_collision = 0;
+	int y_collision = 0;
+	int z_collision = 0;
+
+	int possibly_hit_ground = 0;
+	if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
+		// xs overlap
+		x_collision = 1;
+		if (bruh) {
+			printf("\nxs overlap");
+		}
+	}
+	if (player_y1 <= y1 && player_y1 >= y2) {
+		// ys overlap
+		if (bruh) {
+			printf("\nys overlap");
+		}
+		y_collision = 1;
+	}
+	if (player_y2 <= y1 && player_y2 >= y2) {
+		y_collision = 1;
+		possibly_hit_ground = 1;
+		if (bruh) {
+			printf("\nys overlap");
+		}
+	}
+	if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
+		// zs overlap
+		z_collision = 1;
+		if (bruh) {
+			printf("\nzs overlap");
+		}
+	}
+	if (x_collision && y_collision && z_collision) {
+		if (possibly_hit_ground) {
+		if (bruh) {
+			printf("\nxs overlap");
+		}
+			flying = 0;
+		}
+		return 1;
+	}
+	return 0;
+}
+
 int collided() {
 
 	for (int cube_i = 0; cube_i < CUBES_PER_CHUNK; cube_i++) {
@@ -518,51 +585,12 @@ int collided() {
 			continue;
 		}
 
-		// x1 = top left front
-		int x1 = chunks[occupied_chunk_index].pos.x + (CUBE_X(cube_i) * CUBE_WIDTH);
-		int y1 = chunks[occupied_chunk_index].pos.y + (CUBE_Y(cube_i) * CUBE_WIDTH);
-		int z1 = chunks[occupied_chunk_index].pos.z + (CUBE_Z(cube_i) * CUBE_WIDTH);
+		// top left front
+		int x = chunks[occupied_chunk_index].pos.x + (CUBE_X(cube_i) * CUBE_WIDTH);
+		int y = chunks[occupied_chunk_index].pos.y + (CUBE_Y(cube_i) * CUBE_WIDTH);
+		int z = chunks[occupied_chunk_index].pos.z + (CUBE_Z(cube_i) * CUBE_WIDTH);
 
-		// x2 = bottom right back
-		int x2 = x1 + CUBE_WIDTH;	
-		int y2 = y1 - CUBE_WIDTH;	
-		int z2 = z1 + CUBE_WIDTH;
-
-		// player_x1 = top left front
-		int player_x1 = player_pos.x - player_width;
-		int player_y1 = player_pos.y + player_height;
-		int player_z1 = player_pos.z - player_width;
-
-		// player_x1 = bottom right back
-		int player_x2 = player_pos.x + player_width;
-		int player_y2 = player_pos.y - player_width;
-		int player_z2 = player_pos.z + player_width;
-
-		int x_collision = 0;
-		int y_collision = 0;
-		int z_collision = 0;
-
-		int possibly_hit_ground = 0;
-		if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
-			// xs overlap
-			x_collision = 1;
-		}
-		if (player_y1 <= y1 && player_y1 >= y2) {
-			// ys overlap
-			y_collision = 1;
-		}
-		if (player_y2 <= y1 && player_y2 >= y2) {
-			y_collision = 1;
-			possibly_hit_ground = 1;
-		}
-		if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
-			// zs overlap
-			z_collision = 1;
-		}
-		if (x_collision && y_collision && z_collision) {
-			if (possibly_hit_ground) {
-				flying = 0;
-			}
+		if (player_inside_cube((vec3_t){x, y, z})) {
 			return 1;
 		}
 	}
@@ -2063,47 +2091,11 @@ void player_place_cube() {
 	int y1 = pos.y;
 	int z1 = pos.z;
 
-	// x2 = bottom right back
-	int x2 = x1 + CUBE_WIDTH;	
-	int y2 = y1 - CUBE_WIDTH;	
-	int z2 = z1 + CUBE_WIDTH;
-
-	// player is 2 cubes high
-	player_pos.y -= CUBE_WIDTH;
-
-	// player_x1 = top left front
-	int player_x1 = player_pos.x - player_width;
-	int player_y1 = player_pos.y + player_height;
-	int player_z1 = player_pos.z - player_width;
-
-	// player_x1 = bottom right back
-	int player_x2 = player_pos.x + player_width;
-	int player_y2 = player_pos.y - player_width;
-	int player_z2 = player_pos.z + player_width;
-
-	int x_collision = 0;
-	int y_collision = 0;
-	int z_collision = 0;
-
-	if ((player_x1 >= x1 && player_x1 <= x2) || (player_x2 >= x1 && player_x2 <= x2)) {
-		// xs overlap
-		x_collision = 1;
-	}
-	if ((player_y1 <= y1 && player_y1 >= y2) || (player_y2 <= y1 && player_y2 >= y2)) {
-		// ys overlap
-		y_collision = 1;
-	}
-	if ((player_z1 >= z1 && player_z1 <= z2) || (player_z2 >= z1 && player_z2 <= z2)) {
-		// zs overlap
-		z_collision = 1;
-	}
-
-	// player is 2 cubes high
-	player_pos.y += CUBE_WIDTH;
-
-	if (x_collision && y_collision && z_collision) {
+	bruh = 1;
+	if (player_inside_cube((vec3_t){x1, y1, z1})) {
 		return;
 	}
+	bruh = 0;
 
 	texture_t *texture = grass_texture;
 
