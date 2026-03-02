@@ -8,7 +8,7 @@ I have used gpt to help write the x11 or winapi parts of the code,
 so I can just have my array of pixels that I update each frame.
 I also used gpt to make the write and read PPM functions as this does not
 interest me, and also for perlin noise, as this is outside the scope of this project
-but I thought it would be nice to have. Everything else is from scratch.
+but I thought it would be nice to have. Everything else is from scratch!
 
 Work done so far:
  - a fill function that takes 4 points and a colour, and fills the screen with that colour
@@ -18,6 +18,7 @@ Work done so far:
  - simple cubicy collisions
  - simple hotbar
  - don't draw back faces, or faces with a neighbouring face
+ - placing and removing cubes within any chunk
  - chunk system with dynamically saved chunk edits
  - chunk generation from a given noise function
  - tree generation saved using the chunk edits
@@ -29,8 +30,9 @@ Known issues:
  - rendering issues when some points of a square have negative z values
 
 Next steps:
- - from profiling I can see that the fill square function accounts for the most program instructions
+ - from profiling I can see that the fill square function accounts for nearly half the total program instructions
  - cache hits seem good, so the next step would be to come up with a faster fill square algorithm...
+ - I tried a few similar variations with fewer conditionals, but with little difference...
 
 To compile:
  - linux:  
