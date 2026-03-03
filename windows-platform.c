@@ -95,12 +95,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int prev_hold_mouse = 0;
 
-    // --- FPS counter state ---
-    int frame_count = 0;
-    int fps_display = 0;
-    struct timespec fps_timer;
-    clock_gettime(CLOCK_MONOTONIC, &fps_timer);
-
     MSG msg;
     while (1) {
         // --- Handle all pending messages (non-blocking) ---
@@ -145,26 +139,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         // --- Update ---
         update();
-
-        // --- FPS: count frames, update display value once per second ---
-        frame_count++;
-        struct timespec fps_now;
-        clock_gettime(CLOCK_MONOTONIC, &fps_now);
-        long fps_elapsed = (fps_now.tv_sec  - fps_timer.tv_sec)  * 1000000000L
-                         + (fps_now.tv_nsec - fps_timer.tv_nsec);
-        if (fps_elapsed >= 1000000000L) {
-            fps_display = frame_count;
-            frame_count = 0;
-            fps_timer = fps_now;
-        }
-
-        // --- Draw FPS onto memDC (on top of pixel buffer) ---
-        char fps_text[32];
-        sprintf(fps_text, "FPS: %d", fps_display);
-        SetBkMode(memDC, TRANSPARENT);
-        SetTextColor(memDC, RGB(255, 255, 255));
-        RECT r = { 4, 4, 200, 24 };
-        DrawText(memDC, fps_text, -1, &r, DT_LEFT | DT_TOP | DT_SINGLELINE);
 
         // --- Render ---
         InvalidateRect(hwnd, NULL, FALSE);
