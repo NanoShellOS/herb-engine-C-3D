@@ -50,7 +50,7 @@ To compile:
    - gcc -o main.exe -lgdi32 -mwindows -O3 -march=native .\main-windows.c
 
 Or play right now (claude rewrote linux_platform.c for compilation with emcc to web assembly!) on my website:  
-https:/niceboisnice.com/digmake  
+https://niceboisnice.com/digmake
   
 Dev screenshots:
 
