@@ -1,10 +1,6 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdint.h>
-#include <string.h>
 #include <math.h>
-#include <assert.h>
 #include <time.h>
 
 /* -------------------------- TODO list -------------------------- */
@@ -462,11 +458,6 @@ void cleanup() {
 	free(leaf_texture->pixels);
 	free(sand_texture->pixels);
 	free(water_texture->pixels);
-	return;
-}
-
-void debug_log(char *str) {
-	printf("\n%s", str);
 	return;
 }
 
@@ -2801,7 +2792,6 @@ void generate_textures() {
     grass_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	grass_texture->width = width;
 	grass_texture->height = height;
-	assert(grass_texture != NULL);
 
 	// top
 	int i = 0;
@@ -2828,7 +2818,6 @@ void generate_textures() {
     stone_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	stone_texture->width = width;
 	stone_texture->height = height;
-	assert(stone_texture != NULL);
 
 	i = 0;
 	for (i; i < SQUARES_PER_FACE * 3; i++) {
@@ -2841,7 +2830,6 @@ void generate_textures() {
     dirt_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	dirt_texture->width = width;
 	dirt_texture->height = height;
-	assert(dirt_texture != NULL);
 
 	i = 0;
 	for (i; i < SQUARES_PER_FACE * 3; i++) {
@@ -2855,7 +2843,6 @@ void generate_textures() {
     wood_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	wood_texture->width = width;
 	wood_texture->height = height;
-	assert(wood_texture != NULL);
 
 	i = 0;
 	for (i; i < SQUARES_PER_FACE; i++) {
@@ -2876,7 +2863,6 @@ void generate_textures() {
     leaf_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	leaf_texture->width = width;
 	leaf_texture->height = height;
-	assert(leaf_texture != NULL);
 
 	i = 0;
 	for (i; i < SQUARES_PER_FACE * 3; i++) {
@@ -2889,7 +2875,6 @@ void generate_textures() {
     sand_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	sand_texture->width = width;
 	sand_texture->height = height;
-	assert(sand_texture != NULL);
 
 	i = 0;
 	for (i; i < SQUARES_PER_FACE * 3; i++) {
@@ -2902,7 +2887,6 @@ void generate_textures() {
     water_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
 	water_texture->width = width;
 	water_texture->height = height;
-	assert(water_texture != NULL);
 
 	i = 0;
 	for (i; i < SQUARES_PER_FACE * 3; i++) {
