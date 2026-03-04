@@ -14,7 +14,7 @@ Work done so far:
  - a rotate and project function that takes an x y and z and rotates it about the camera using a global x and y rotation, and projects it by z
  - texture mapping, which takes each square, and colours it pixel by pixel from a given texture
  - simple cubicy collisions
- - simple hotbar/hand with different blocks accesible by pressing 1-6
+ - simple hotbar/hand with different blocks accesible by pressing 1-9
  - back face culling, neighbour face culling
  - placing and removing cubes within any chunk
  - chunk system with dynamically saved chunk edits
