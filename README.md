@@ -49,9 +49,11 @@ Next steps:
 
 To compile:
  - linux:  
-   - gcc -o main.o -lX11 -lm -O3 -march=native ./linux2.c  
+   - gcc -o DigMake.o -lX11 -lm -O3 -march=native ./linux2.c  
  - Windows:
-   - gcc -o main.exe -lgdi32 -mwindows -O3 -march=native .\main-windows.c
+   - gcc -o DigMake.exe -lgdi32 -mwindows -O3 -march=native .\main-windows.c
+ - Web:
+   - emcc main_web.c -O2 -lm -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='["ccall"]' -s EXPORTED_FUNCTIONS='["_main","_set_holding_mouse"]' -o DigMake.html
 
 Or play right now (claude rewrote linux_platform.c for compilation with emcc to web assembly!) on my website:  
 https://niceboisnice.com/digmake
