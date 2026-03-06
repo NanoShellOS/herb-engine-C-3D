@@ -177,7 +177,7 @@ static void cleanup();
 // physics
 static int player_inside_cube(vec3_t cube_top_left_front_pos);
 static int collided();
-static void update_day_cycle();
+static void update_sun_level();
 
 // input
 static void handle_input();
@@ -206,7 +206,7 @@ static int square_surrounds_centre_of_screen(square_t *square);
 static int compare_faces(const void *one, const void *two);
 
 static void set_fog_level(colour_t *c, float fog_r);
-static void set_light_level(colour_t *c, float fog_r);
+static void set_light_level(colour_t *c, float fog_r, int side);
 
 static void render_chunks();
 static void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_pos, face_t *faces_array, int index);
@@ -265,10 +265,9 @@ static int jump_height;
 static int can_jump;
 
 // physics
-static float day_cycle;
-static float max_day_cycle;
-static int cycle_frame_interval;
-static float night_length;
+static float sun_level;
+static float max_sun_level;
+static float day_length;
 static int day;
 static int night;
 
@@ -378,11 +377,10 @@ void init_stuff() {
 	gravity = - CUBE_WIDTH / 6;
 
 	// - physics
-	day_cycle = 0;
-	night = 1;
-	cycle_frame_interval = 1;
-	max_day_cycle = 480 * 4;
-	night_length = 480 * 4;
+	sun_level = 0;
+	day = 1;
+	max_sun_level = 480;
+	day_length = 21600; // 60 fps * 60 * 6 = 21600 = 6 minutes
 
 	// - input
 	holding_mouse = 1;
@@ -441,7 +439,7 @@ void update() {
 	}
 	frame++;
 
-	update_day_cycle();
+	update_sun_level();
 
 	handle_input();
 
@@ -468,40 +466,36 @@ void cleanup() {
 }
 
 /* ------------------------------- physics ------------------------------- */
-void update_day_cycle() {
+void update_sun_level() {
 
-	if (night) {
-		if (frame % cycle_frame_interval == 0 && day_cycle < max_day_cycle) {
-			day_cycle += 1;
+	if (day) {
+		if (sun_level < max_sun_level) {
+			sun_level += 1;
 		}	
-		if (day_cycle == max_day_cycle) {
-			if (frame % cycle_frame_interval == 0) {
-				night += 1;
-			}
-			if (night == night_length) {
-				night = 0;
-				day = 1;
-			}
-		}
-	}
-	else if (day) {
-		if (frame % cycle_frame_interval == 0 && day_cycle > 0) {
-			day_cycle -= 1;
-		}	
-		if (day_cycle == 0) {
-			if (frame % cycle_frame_interval == 0) {
-				day += 1;
-			}
-			if (day == night_length) {
+		if (sun_level == max_sun_level) {
+			day += 1;
+			if (day == day_length) {
 				day = 0;
 				night = 1;
 			}
 		}
 	}
+	else if (night) {
+		if (sun_level > 0) {
+			sun_level -= 1;
+		}	
+		if (sun_level == 0) {
+			night += 1;
+			if (night == day_length) {
+				night = 0;
+				day = 1;
+			}
+		}
+	}
 
-	sky.r = (char)((float)max_sky.r * (day_cycle / max_day_cycle));
-	sky.g = (char)((float)max_sky.g * (day_cycle / max_day_cycle));
-	sky.b = (char)((float)max_sky.b * (day_cycle / max_day_cycle));
+	sky.r = (char)((float)max_sky.r * (sun_level / max_sun_level));
+	sky.g = (char)((float)max_sky.g * (sun_level / max_sun_level));
+	sky.b = (char)((float)max_sky.b * (sun_level / max_sun_level));
 
 	return;
 }
@@ -1301,7 +1295,7 @@ void render_chunks() {
 								// 0 as that is the top texture
 								colour_t c = texture->pixels[j * TEXTURE_WIDTH + i];
 
-								set_light_level(&c, fog_r);
+								set_light_level(&c, fog_r, TOP);
 								set_fog_level(&c, fog_r);
 
 								square.colour = pack_colour_to_uint32(&c);
@@ -1349,7 +1343,7 @@ void render_chunks() {
 								// 1, as the top face textures are the first square of the texture image
 								colour_t c = texture->pixels[1 * texture_side + j * TEXTURE_WIDTH + i];
 
-								set_light_level(&c, fog_r);
+								set_light_level(&c, fog_r, BOTTOM);
 								set_fog_level(&c, fog_r);
 
 								square.colour = pack_colour_to_uint32(&c);
@@ -1397,7 +1391,7 @@ void render_chunks() {
 								// 2, as the side face textures are the 2nd square of the texture image
 								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
 
-								set_light_level(&c, fog_r);
+								set_light_level(&c, fog_r, FRONT);
 								set_fog_level(&c, fog_r);
 
 								square.colour = pack_colour_to_uint32(&c);
@@ -1444,7 +1438,7 @@ void render_chunks() {
 
 								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
 
-								set_light_level(&c, fog_r);
+								set_light_level(&c, fog_r, BACK);
 								set_fog_level(&c, fog_r);
 
 								square.colour = pack_colour_to_uint32(&c);
@@ -1491,7 +1485,7 @@ void render_chunks() {
 
 								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
 
-								set_light_level(&c, fog_r);
+								set_light_level(&c, fog_r, LEFT);
 								set_fog_level(&c, fog_r);
 
 								square.colour = pack_colour_to_uint32(&c);
@@ -1538,7 +1532,7 @@ void render_chunks() {
 
 								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
 
-								set_light_level(&c, fog_r);
+								set_light_level(&c, fog_r, RIGHT);
 								set_fog_level(&c, fog_r);
 
 								square.colour = pack_colour_to_uint32(&c);
@@ -1904,12 +1898,40 @@ void set_fog_level(colour_t *c, float fog_r) {
 	return;
 }
 
-void set_light_level(colour_t *c, float fog_r) {
+void set_light_level(colour_t *c, float fog_r, int side) {
+	float front_side = 0.9;
+	float left_side = 0.85;
+	float back_side = 0.8;
+	float right_side = 0.85;
+	float bottom_side = 0.7;
 
 	float illumination = 1.0f / (fog_r * 0.001);
-	illumination += day_cycle / max_day_cycle;
+	illumination += sun_level / max_sun_level;
 	if (illumination > 1) {
 		illumination = 1;
+	}
+
+	switch (side) {
+		case FRONT: {
+			illumination *= front_side;
+			break;
+		}
+		case LEFT: {
+			illumination *= left_side;
+			break;
+		}
+		case RIGHT: {
+			illumination *= right_side;
+			break;
+		}
+		case BACK: {
+			illumination *= back_side;
+			break;
+		}
+		case BOTTOM: {
+			illumination *= bottom_side;
+			break;
+		}
 	}
 
 	float r = ((float)c->r) * illumination;
