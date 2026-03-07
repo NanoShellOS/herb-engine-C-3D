@@ -54,7 +54,7 @@ To compile:
  - Web:
    - emcc main_web.c -O2 -lm -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='["ccall"]' -s EXPORTED_FUNCTIONS='["_main","_set_holding_mouse"]' -o DigMake.html
 
-Or play right now (claude rewrote linux_platform.c for compilation with emcc to web assembly!) on my website:  
+Or play right now (warning: may crash) on my website:  
 https://niceboisnice.com/digmake
   
 Dev screenshots:
