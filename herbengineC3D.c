@@ -3,20 +3,36 @@
 #include <math.h>
 #include <time.h>
 
+#ifdef NANOSHELL
+#include "nanoshell/game.h"
+#define qsort FAST_qsort
+#endif
+
 /* -------------------------- TODO list -------------------------- */
 
 // fix rendering issue when some points have -z the square draws rlly big on screen
 
 /* -------------------------- defines -------------------------- */
 
+#ifdef NANOSHELL
+
+// tweaked for better performance
+#define WIDTH  320
+#define HEIGHT 240
+#define FOV 3
+#define TEXTURE_WIDTH 1
+
+#else
+
 #define WIDTH  1920
 #define HEIGHT 1080
-
 #define FOV 2
+#define TEXTURE_WIDTH 2
+
+#endif
+
 
 #define CUBE_WIDTH 1000
-
-#define TEXTURE_WIDTH 2
 
 #define SQUARES_PER_FACE (TEXTURE_WIDTH * TEXTURE_WIDTH)
 #define SQUARES_PER_CUBE (TEXTURE_WIDTH * TEXTURE_WIDTH * 6)
@@ -279,7 +295,7 @@ static int mouse_was_left_clicked;
 static int mouse_right_click;
 static int mouse_was_right_clicked;
 static int holding_mouse;
-static int mouse_defined;
+//static int mouse_defined;
 
 static int keys[256] = {0};
 static unsigned char w, a, s, d, shift, space, control, escape;
@@ -1612,8 +1628,6 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 
 	for (int face_i = 0; face_i < 6; face_i++) {
 
-		int highlight = 0;
-
 		float centre_x;
 		float centre_y;
 		float centre_z;
@@ -2293,7 +2307,7 @@ void player_place_cube() {
 
 	// check if cube highlighted is at a chunk edge
 	int x = CUBE_X(highlighted_cube_index);
-	int y = CUBE_Y(highlighted_cube_index);
+	//int y = CUBE_Y(highlighted_cube_index);
 	int z = CUBE_Z(highlighted_cube_index);
 
 	// if it is, need to make sure we have the right chunk and cube index
@@ -2925,15 +2939,15 @@ void generate_textures() {
 
 	// top
 	int i = 0;
-	for (i; i < SQUARES_PER_FACE; i++) {
+	for (; i < SQUARES_PER_FACE; i++) {
 		grass_texture->pixels[i] = (colour_t){10, 180 + (rand() % 70), 20 + (rand() % 60)};
 	}
 	// bottom
-	for (i; i < 2 * SQUARES_PER_FACE; i++) {
+	for (; i < 2 * SQUARES_PER_FACE; i++) {
 		grass_texture->pixels[i] = (colour_t){150 + (rand() % 70), 75 + (rand() % 60), 10 + (rand() % 60)};
 	}
 	// side
-	for (i; i < 3 * SQUARES_PER_FACE; i++) {
+	for (; i < 3 * SQUARES_PER_FACE; i++) {
 		if (i < 2.5 * SQUARES_PER_FACE) {
 			grass_texture->pixels[i] = (colour_t){10, 180 + (rand() % 70), 20 + (rand() % 60)};
 		}
@@ -2950,7 +2964,7 @@ void generate_textures() {
 	stone_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		stone_texture->pixels[i] = (colour_t){110 + (rand()  % 20), 110 + (rand()  % 20), 120 + (rand()  % 20)};
 	}
 
@@ -2962,7 +2976,7 @@ void generate_textures() {
 	dirt_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		dirt_texture->pixels[i] = (colour_t){150 + (rand() % 70), 75 + (rand() % 60), 10 + (rand() % 60)};
 	}
 
@@ -2975,15 +2989,15 @@ void generate_textures() {
 	wood_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE; i++) {
+	for (; i < SQUARES_PER_FACE; i++) {
 		wood_texture->pixels[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50)};
 	}
 	// bottom
-	for (i; i < 2 * SQUARES_PER_FACE; i++) {
+	for (; i < 2 * SQUARES_PER_FACE; i++) {
 		wood_texture->pixels[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50)};
 	}
 	// side
-	for (i; i < 3 * SQUARES_PER_FACE; i++) {
+	for (; i < 3 * SQUARES_PER_FACE; i++) {
 		wood_texture->pixels[i] = (colour_t){ 110 + (rand() % 7),  70 + (rand() % 15),  40 + (rand() % 10)};
 	}
 
@@ -2995,7 +3009,7 @@ void generate_textures() {
 	leaf_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		leaf_texture->pixels[i] = (colour_t){5 - (rand()  % 5), 95 - (rand()  % 40), 7 - (rand()  % 7)};
 	}
 
@@ -3007,7 +3021,7 @@ void generate_textures() {
 	sand_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		sand_texture->pixels[i] = (colour_t){240 - (rand()  % 5), 190 - (rand()  % 40), 80 - (rand()  % 7)};
 	}
 
@@ -3019,7 +3033,7 @@ void generate_textures() {
 	water_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		water_texture->pixels[i] = (colour_t){50 + (rand() % 50), 50 + (rand() % 50), 255};
 	}
 
@@ -3031,7 +3045,7 @@ void generate_textures() {
 	black_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		black_texture->pixels[i] = (colour_t){30 + (rand()  % 20), 30 + (rand()  % 20), 30 + (rand()  % 20)};
 	}
 
@@ -3043,7 +3057,7 @@ void generate_textures() {
 	white_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		white_texture->pixels[i] = (colour_t){220 + (rand()  % 20), 220 + (rand()  % 20), 220 + (rand()  % 20)};
 	}
 
@@ -3055,7 +3069,7 @@ void generate_textures() {
 	beige_texture->height = height;
 
 	i = 0;
-	for (i; i < SQUARES_PER_FACE * 3; i++) {
+	for (; i < SQUARES_PER_FACE * 3; i++) {
 		beige_texture->pixels[i] = (colour_t){200 + (rand()  % 20), 150 + (rand()  % 20), 120 + (rand()  % 20)};
 	}
 
@@ -3125,3 +3139,98 @@ double perlin2D(perlin_t *n, double x, double y)
         v
     );
 }
+
+// ---- END OF herbengineC3D.c.  Start of port logic ----
+
+#ifdef NANOSHELL
+
+#include <nanoshell/nanoshell.h>
+
+void UpdateKeyStates();
+void ResetToMiddle();
+
+bool WantCaptureMouse()
+{
+	return holding_mouse;
+}
+
+void Update(int deltaTime)
+{
+	(void) deltaTime;
+	UpdateKeyStates();
+	ResetToMiddle();
+	update();
+}
+
+void Render(int deltaTime)
+{
+	(void) deltaTime;
+	Image i;
+	i.width = WIDTH;
+	i.height = HEIGHT;
+	i.framebuffer = (const uint32_t *)pixels;
+	//VidBlitImage(&i, 0, 0);
+	VidBlitImageResize(&i, 0, 0, WIDTH * 2, HEIGHT * 2);
+}
+
+void OnSize(int width, int height)
+{
+	(void) width;
+	(void) height;
+}
+
+void Init()
+{
+	init_stuff();
+
+	w = KEY_W;
+	a = KEY_A;
+	d = KEY_D;
+	s = KEY_S;
+	space  = KEY_SPACE;
+	control = KEY_CTRL;
+	escape  = KEY_ESC;
+	one   = KEY_1;
+	two   = KEY_2;
+	three = KEY_3;
+	four  = KEY_4;
+	five  = KEY_5;
+	six   = KEY_6;
+	seven = KEY_7;
+	eight = KEY_8;
+	nine  = KEY_9;
+
+	pixels = malloc(sizeof(uint32_t) * WIDTH * HEIGHT);
+}
+
+int mouseX, mouseY;
+bool mouseL, mouseR, setPause;
+extern bool gKeyboardState[128];
+
+void UpdateKeyStates()
+{
+	// Update mouse
+	mouse_left_click = mouseL;
+	mouse_right_click = mouseR;
+
+	mouse.x = mouseX + WIDTH / 2;
+	mouse.y = mouseY + HEIGHT / 2;
+	mouseX = 0;
+	mouseY = 0;
+
+	paused = setPause;
+
+	for (int i = 0; i < 128; i++)
+		keys[i] = gKeyboardState[i];
+}
+
+void CleanUp()
+{
+	cleanup();
+}
+
+const char* GetGameName() {
+	return "herbengineC3D";
+}
+
+#endif

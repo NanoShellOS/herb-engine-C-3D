@@ -1,0 +1,11 @@
+// NanoShell Resource File
+SubSystem Gui
+Version   1 1 0
+
+AppName      "DigMine"
+AppAuthor    "42henry"
+AppCopyright "Copyright (C) 2026 42henry"
+ProjectName  "The NanoShell(TM) OS Port Collection"
+
+//Resource 1000 Bitmap "world_map.png"
+
