@@ -120,8 +120,52 @@ static bool SetupWindow (const char* TITLE)
 	return true;
 }
 
-int main()
+int main(int argc, char ** argv)
 {
+	LogMsg("WHAT HOW");
+	InitSinCosTable();
+	
+	LogMsg("argc = %d", argc);
+	if (argc > 1) {
+		LogMsg("trying to parse the float");
+		// try to parse the float
+		int aboveDecimal = 0;
+		int belowDecimal = 0;
+		int powerOf10 = 1;
+		
+		char* v = argv[1];
+		bool parsingDecimal = false;
+		while (*v) {
+			if (*v == '.') {
+				parsingDecimal = true;
+				v++;
+				continue;
+			}
+			
+			if (parsingDecimal) {
+				belowDecimal *= 10;
+				belowDecimal += *v - '0';
+				powerOf10 *= 10;
+			}
+			else {
+				aboveDecimal *= 10;
+				aboveDecimal += *v - '0';
+			}
+			v++;
+		}
+		
+		float val = (float)aboveDecimal + (float)belowDecimal / (float)powerOf10;
+		
+		extern float coeff_here;
+		coeff_here = val;
+		
+		long long coeff_here_ll = (long long)(coeff_here * 1000000000);
+		LogMsg("Setting coeff to %d.%09d", 
+			(int)(coeff_here),
+			(int)(coeff_here_ll % 1000000000)
+		);
+	}
+	
 	if (!SetupWindow(GetGameName()))
 		return 1;
 	

@@ -23,8 +23,11 @@ int Classify(double x);
 #define isnan(x) (Classify(x) == FP_NAN)
 
 
-double sin(double x);
-double cos(double x);
+//double sin(double x);
+//double cos(double x);
+float sin(float x);
+float cos(float x);
+
 double sqrt(double x);
 double Abs(double x);
 double Trim(double x);
@@ -38,6 +41,7 @@ bool IsKeyDown (int keyCode);
 
 // from game:
 const char* GetGameName();
+void InitSinCosTable();
 void Update (int deltaTime);
 void Render (int deltaTime);
 void Init   ();

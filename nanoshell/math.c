@@ -2,22 +2,46 @@
 #include "game.h"
 
 // useful double functions
-double sin(double x)
+double __sin(double x)
 {
     double result;
     __asm__ volatile("fsin" : "=t"(result) : "0"(x));
     return result;
 }
+//double __cos(double x)
+//{
+//    double result;
+//    __asm__ volatile("fcos" : "=t"(result) : "0"(x));
+//    return result;
+//}
+
+float SinCosTable[65536];
+
+void InitSinCosTable()
+{
+	for (int i = 0; i < 65536; i++) {
+		SinCosTable[i] = __sin(i * 2 * PI / 65536.0);
+	}
+}
+
+float sin(float x)
+{
+	x /= 2 * PI;
+	x *= 65535;
+	return SinCosTable[(int)x & 0xFFFF];
+}
+
+float cos(float x)
+{
+	x /= 2 * PI;
+	x *= 65535;
+	return SinCosTable[(int)(x + 16384) & 0xFFFF];
+}
+
 double sqrt(double x)
 {
     double result;
     __asm__ volatile("fsqrt" : "=t"(result) : "0"(x));
-    return result;
-}
-double cos(double x)
-{
-    double result;
-    __asm__ volatile("fcos" : "=t"(result) : "0"(x));
     return result;
 }
 

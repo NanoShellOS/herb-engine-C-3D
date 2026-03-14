@@ -3,6 +3,8 @@
 #include <math.h>
 #include <time.h>
 
+//#define OVERRIDE_TEXTURED_SQUARE
+
 #ifdef NANOSHELL
 #include "nanoshell/game.h"
 #define qsort FAST_qsort
@@ -30,7 +32,6 @@
 #define TEXTURE_WIDTH 2
 
 #endif
-
 
 #define CUBE_WIDTH 1000
 
@@ -257,6 +258,11 @@ static double fade(double t);
 static double lerp(double a, double b, double t);
 static double grad(int h, double x, double y);
 static double perlin2D(perlin_t *n, double x, double y);
+
+#ifdef OVERRIDE_TEXTURED_SQUARE
+void fill_square_textured(square_t *square);
+void clear_depth_buffer();
+#endif
 
 /* -------------------------- local variables -------------------------- */
 
@@ -906,7 +912,9 @@ colour_t get_pixel_colour(vec2_t coord) {
 }
 
 void update_pixels() {
-
+#ifdef OVERRIDE_TEXTURED_SQUARE
+	clear_depth_buffer();
+#endif
     clear_screen(sky);
 
 	render_chunks();
@@ -937,7 +945,6 @@ void draw_all_faces() {
 }
 
 void fill_square(square_t *square) {
-
 	int smallest_y = HEIGHT + 1;
 	int smallest_y_index = 0;
 	int largest_y = -1;
@@ -964,6 +971,10 @@ void fill_square(square_t *square) {
 		return;
 	}
 
+#ifdef OVERRIDE_TEXTURED_SQUARE
+	(void) smallest_y_index;
+	fill_square_textured(square);
+#else
 	if (smallest_y < 0) {
 		smallest_y = 0;
 	}
@@ -1109,6 +1120,7 @@ void fill_square(square_t *square) {
 	}
 
 	return;
+#endif
 }
 
 void draw_rect(vec3_t top_left, int width, int height, colour_t colour) {
@@ -1609,7 +1621,9 @@ void render_chunks() {
 	}
 
 	// sort the faces based on their distance to the camera
+#ifndef OVERRIDE_TEXTURED_SQUARE
 	qsort(draw_faces.items, draw_faces.count, sizeof(face_t), compare_faces);
+#endif
 	return;
 }
 
@@ -1978,15 +1992,14 @@ void set_light_level(colour_t *c, float fog_r, int side) {
 	return;
 }
 
-vec3_t rotate_and_project(vec3_t pos) {
-
+vec3_t rotate_and_project_internal(vec3_t pos, float sin_x_rot, float cos_x_rot, float sin_y_rot, float cos_y_rot) {
 	// rotate
 	vec3_t new_pos;
-	new_pos.x = (pos.z * sine_x_rotation + pos.x * cos_x_rotation);
-	int z2 = (pos.z * cos_x_rotation - pos.x * sine_x_rotation);
+	new_pos.x = (pos.z * sin_x_rot + pos.x * cos_x_rot);
+	float z2 = (pos.z * cos_x_rot - pos.x * sin_x_rot); // N.B. was "int z2"
 
-	new_pos.y = (z2 * sine_y_rotation + pos.y * cos_y_rotation);
-	new_pos.z = (z2 * cos_y_rotation - pos.y * sine_y_rotation);
+	new_pos.y = (z2 * sin_y_rot + pos.y * cos_y_rot);
+	new_pos.z = (z2 * cos_y_rot - pos.y * sin_y_rot);
 
 	int neg = 0;
 	if (new_pos.z <= 0) {
@@ -2010,37 +2023,12 @@ vec3_t rotate_and_project(vec3_t pos) {
 	return new_pos;
 }
 
+vec3_t rotate_and_project(vec3_t pos) {
+	return rotate_and_project_internal(pos, sine_x_rotation, cos_x_rotation, sine_y_rotation, cos_y_rotation);
+}
+
 vec3_t rotate_and_project_by_rot_value(vec3_t pos, float x_rot, float y_rot) {
-
-	// rotate
-	vec3_t new_pos;
-	new_pos.x = (pos.z * sin(x_rot) + pos.x * cos(x_rot));
-	int z2 = (pos.z * cos(x_rot) - pos.x * sin(x_rot));
-
-	new_pos.y = (z2 * sin(y_rot) + pos.y * cos(y_rot));
-	new_pos.z = (z2 * cos(y_rot) - pos.y * sin(y_rot));
-
-	int neg = 0;
-	if (new_pos.z <= 0) {
-		neg = 1;
-		// avoid divide by 0
-		new_pos.z = 7;
-	}
-
-	// project
-	float percent_size = ((float)((WIDTH / 10) * FOV) / new_pos.z);
-	new_pos.x *= percent_size;
-	new_pos.y *= percent_size;
-
-	// convert from standard grid to screen grid
-	new_pos.x = new_pos.x + WIDTH / 2;
-	new_pos.y = -new_pos.y + HEIGHT / 2;
-
-	if (neg) {
-		new_pos.z = -1;
-	}
-
-	return new_pos;
+	return rotate_and_project_internal(pos, sin(x_rot), cos(x_rot), sin(y_rot), cos(y_rot));
 }
 
 /* ------------------------------- cube handling ------------------------------- */
@@ -3162,6 +3150,8 @@ void Update(int deltaTime)
 	update();
 }
 
+//static float pDepthBuffer[WIDTH * HEIGHT];
+
 void Render(int deltaTime)
 {
 	(void) deltaTime;
@@ -3170,6 +3160,15 @@ void Render(int deltaTime)
 	i.height = HEIGHT;
 	i.framebuffer = (const uint32_t *)pixels;
 	//VidBlitImage(&i, 0, 0);
+	
+	//for (int i=0; i<WIDTH*HEIGHT; i++){
+	//	float v=pDepthBuffer[i];
+	//	if(v<0)v=0;
+	//	if(v>1)v=1;
+	//	uint8_t b= 255*v;
+	//	pixels[i]=b|(b<<8)|(b<<16);
+	//}
+	
 	VidBlitImageResize(&i, 0, 0, WIDTH * 2, HEIGHT * 2);
 }
 
@@ -3234,3 +3233,56 @@ const char* GetGameName() {
 }
 
 #endif
+
+// TODO: only works on nanoshell atm
+#ifdef OVERRIDE_TEXTURED_SQUARE
+
+#include "textured_triangle.h"
+#include "bricks.h"
+#include "crate.h"
+
+/*
+typedef struct {
+	int x;
+	int y;
+	int z;	
+} vec3_t;
+
+typedef struct {
+	vec3_t coords[4];	
+	uint32_t colour;
+	int water;
+} square_t;
+*/
+
+#define CRDS(square, idx) ((square)->coords[(idx)].x), ((square)->coords[(idx)].y)
+#define Z(square, idx) ((square)->coords[(idx)].z)
+
+float coeff_here = 1000.0f;
+
+static float safe_z_to_w(int z)
+{
+	if (z == 0)
+		return 1.0f;
+	return coeff_here / (float) z;
+}
+
+void SLogMsg(const char*,...);
+void fill_square_textured(square_t *square)
+{
+	textured_triangle(
+		CRDS(square, 0), 0.0f, 0.0f, safe_z_to_w(Z(square, 0)),
+		CRDS(square, 1), 0.0f, 1.0f, safe_z_to_w(Z(square, 1)),
+		CRDS(square, 2), 1.0f, 1.0f, safe_z_to_w(Z(square, 2)),
+		&g_bricks_icon
+	);
+	textured_triangle(
+		CRDS(square, 0), 0.0f, 0.0f, safe_z_to_w(Z(square, 0)),
+		CRDS(square, 2), 1.0f, 1.0f, safe_z_to_w(Z(square, 2)),
+		CRDS(square, 3), 1.0f, 0.0f, safe_z_to_w(Z(square, 3)),
+		&g_crate_icon
+	);
+}
+
+#endif
+
