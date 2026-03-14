@@ -139,26 +139,26 @@ double fmod(double x, double y)
 	return ux.f;
 }
 
-
-double floor(double x) {
-    unsigned short cw, cw_floor;
-    double result;
-
-    __asm__ volatile ("fnstcw %0" : "=m"(cw));
-
-    cw_floor = cw;
-    cw_floor = (cw_floor & ~0x0C00) | 0x0400;  // set rounding mode = round down
-
-    __asm__ volatile (
-        "fldcw %1\n\t"
-        "fldl %2\n\t"
-        "frndint\n\t"
-        "fstpl %0\n\t"
-        "fldcw %3\n\t"
-        : "=m"(result)
-        : "m"(cw_floor), "m"(x), "m"(cw)
-    );
-
-    return result;
+int floor(float x) {
+	int i = (int)x;
+	if (x < 0 && x != i) {
+		i -= 1;
+	}
+	return i;
 }
 
+int ceil(float x) {
+	int i = (int)x;
+	if (x > 0 && x != i) {
+		i += 1;
+	}
+	return i;
+}
+
+float fmin(float a, float b) {
+	return a < b ? a : b;
+}
+
+float fmax(float a, float b) {
+	return a > b ? a : b;
+}

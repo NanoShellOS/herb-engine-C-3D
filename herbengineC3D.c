@@ -3,7 +3,7 @@
 #include <math.h>
 #include <time.h>
 
-//#define OVERRIDE_TEXTURED_SQUARE
+#define OVERRIDE_TEXTURED_SQUARE
 
 #ifdef NANOSHELL
 #include "nanoshell/game.h"
@@ -19,24 +19,23 @@
 #ifdef NANOSHELL
 
 // tweaked for better performance
-#define WIDTH  320
-#define HEIGHT 240
+#define WIDTH  640 // 320
+#define HEIGHT 480 // 240
+#define SCALE  1 // 2
 #define FOV 3
-#define TEXTURE_WIDTH 1
 
 #else
 
 #define WIDTH  1920
 #define HEIGHT 1080
 #define FOV 2
-#define TEXTURE_WIDTH 2
 
 #endif
 
 #define CUBE_WIDTH 1000
 
-#define SQUARES_PER_FACE (TEXTURE_WIDTH * TEXTURE_WIDTH)
-#define SQUARES_PER_CUBE (TEXTURE_WIDTH * TEXTURE_WIDTH * 6)
+#define SQUARES_PER_FACE (1)
+#define SQUARES_PER_CUBE (1 * 6)
 
 // this should be odd for the best effect - 
 // this way the player will be in a central chunk at all times
@@ -131,8 +130,11 @@ typedef struct {
 
 typedef struct {
 	vec3_t coords[4];	
-	uint32_t colour;
-	int water;
+	texture_t* texture;
+	float fog;
+	unsigned char water;
+	unsigned char direction;
+	unsigned char highlight;
 } square_t;
 
 typedef struct {
@@ -261,7 +263,7 @@ static double perlin2D(perlin_t *n, double x, double y);
 
 #ifdef OVERRIDE_TEXTURED_SQUARE
 void fill_square_textured(square_t *square);
-void clear_depth_buffer();
+//void clear_depth_buffer();
 #endif
 
 /* -------------------------- local variables -------------------------- */
@@ -354,10 +356,13 @@ static int occupied_chunk_index;
 static chunk_edits_t chunk_edits = {0};
 
 // textures
+texture_t *rect_texture = NULL;
 texture_t *grass_texture = NULL;
+texture_t *grass_top_texture = NULL;
 texture_t *dirt_texture = NULL;
 texture_t *stone_texture = NULL;
 texture_t *wood_texture = NULL;
+texture_t *wood_top_texture = NULL;
 texture_t *leaf_texture = NULL;
 texture_t *sand_texture = NULL;
 texture_t *water_texture = NULL;
@@ -369,6 +374,22 @@ texture_t *beige_texture = NULL;
 static perlin_t noise;
 
 /* -------------------------- funciton definitions -------------------------- */
+
+static texture_t *top_texture(texture_t *tex) {
+	if (tex == grass_texture) return grass_top_texture;
+	if (tex == wood_texture) return wood_top_texture;
+	return tex;
+}
+
+static texture_t *bottom_texture(texture_t *tex) {
+	if (tex == grass_texture) return dirt_texture;
+	if (tex == wood_texture) return wood_top_texture;
+	return tex;
+}
+
+static texture_t *side_texture(texture_t *tex) {
+	return tex;
+}
 
 void init_stuff() {
 
@@ -474,6 +495,7 @@ void cleanup() {
 		free(chunk_edits.items[i].cubes);
 	}
 	free(chunk_edits.items);
+	free(rect_texture->pixels);
 	free(grass_texture->pixels);
 	free(dirt_texture->pixels);
 	free(stone_texture->pixels);
@@ -913,7 +935,7 @@ colour_t get_pixel_colour(vec2_t coord) {
 
 void update_pixels() {
 #ifdef OVERRIDE_TEXTURED_SQUARE
-	clear_depth_buffer();
+	//clear_depth_buffer();
 #endif
     clear_screen(sky);
 
@@ -1141,7 +1163,7 @@ void draw_rect(vec3_t top_left, int width, int height, colour_t colour) {
 	square.coords[3].y = top_left.y + height;
 	square.coords[3].z = 10;
 
-	square.colour = pack_colour_to_uint32(&colour);
+	square.texture = rect_texture;
 
 	fill_square(&square);
 	return;
@@ -1167,8 +1189,8 @@ void draw_cursor() {
 	else {
 		colour.b = 255;
 	}
-	int h = 30;
-	int w = 6;
+	int h = 11; // 30;
+	int w = 2;  // 6;
 	draw_rect((vec3_t){WIDTH / 2 - (w / 2), HEIGHT / 2 - (h / 2), 1}, w, h, colour);
 	draw_rect((vec3_t){WIDTH / 2 - (h / 2), HEIGHT / 2 - (w / 2), 1}, h, w, colour);
 	return;
@@ -1229,9 +1251,7 @@ void render_chunks() {
 	int draw_highlight_index = -1;
 	double closest_r = 999999999;
 
-	int len = CUBE_WIDTH / TEXTURE_WIDTH;
-	int texture_side = SQUARES_PER_FACE;
-
+	int len = CUBE_WIDTH;
 	draw_faces.count = 0;
 
 	for (int chunk_i = 0; chunk_i < NUM_CHUNKS; chunk_i++) {
@@ -1311,32 +1331,24 @@ void render_chunks() {
 						float fog_r = sqrt((centre_x * centre_x) + (centre_z * centre_z));
 
 						int count = 0;
-						for (int i = 0; i < TEXTURE_WIDTH; i++) {
-							for (int j = 0; j < TEXTURE_WIDTH; j++) {
-								square_t square = {0};
+						square_t square = {0};
 
-								square.coords[0] = rotate_and_project((vec3_t) {x + (i * len), y, z + (j * len)});
-								square.coords[1] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y, z + (j * len)});
-								square.coords[2] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y, z + ((j + 1) * len)});
-								square.coords[3] = rotate_and_project((vec3_t) {x + (i * len), y, z + ((j + 1) * len)});
+						square.coords[0] = rotate_and_project((vec3_t) {x, y, z});
+						square.coords[1] = rotate_and_project((vec3_t) {x + len, y, z});
+						square.coords[2] = rotate_and_project((vec3_t) {x + len, y, z + len});
+						square.coords[3] = rotate_and_project((vec3_t) {x, y, z + len});
 
-								// 0 as that is the top texture
-								colour_t c = texture->pixels[j * TEXTURE_WIDTH + i];
+						square.texture = top_texture(texture);
+						square.direction = TOP;
+						square.fog = fog_r;
+						if (texture == water_texture) {
+							square.water = 1;
+						}
 
-								set_light_level(&c, fog_r, TOP);
-								set_fog_level(&c, fog_r);
+						face.squares[count++] = square;
 
-								square.colour = pack_colour_to_uint32(&c);
-								if (texture == water_texture) {
-									square.water = 1;
-								}
-
-								face.squares[count++] = square;
-
-								if (square_surrounds_centre_of_screen(&square)) {
-									highlight = 1;
-								}
-							}
+						if (square_surrounds_centre_of_screen(&square)) {
+							highlight = 1;
 						}
 					    break;
 					}
@@ -1359,32 +1371,24 @@ void render_chunks() {
 						float fog_r = sqrt((centre_x * centre_x) + (centre_z * centre_z));
 
 						int count = 0;
-						for (int i = 0; i < TEXTURE_WIDTH; i++) {
-							for (int j = 0; j < TEXTURE_WIDTH; j++) {
-								square_t square = {0};
+						square_t square = {0};
 
-								square.coords[0] = rotate_and_project((vec3_t) {x + (i * len), y, z + (j * len)});
-								square.coords[1] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y, z + (j * len)});
-								square.coords[2] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y, z + ((j + 1) * len)});
-								square.coords[3] = rotate_and_project((vec3_t) {x + (i * len), y, z + ((j + 1) * len)});
+						square.coords[0] = rotate_and_project((vec3_t) {x, y, z});
+						square.coords[1] = rotate_and_project((vec3_t) {x+ len, y, z});
+						square.coords[2] = rotate_and_project((vec3_t) {x+ len, y, z + len});
+						square.coords[3] = rotate_and_project((vec3_t) {x, y, z + len});
 
-								// 1, as the top face textures are the first square of the texture image
-								colour_t c = texture->pixels[1 * texture_side + j * TEXTURE_WIDTH + i];
+						square.texture = bottom_texture(texture);
+						square.direction = BOTTOM;
+						square.fog = fog_r;
+						if (texture == water_texture) {
+							square.water = 1;
+						}
 
-								set_light_level(&c, fog_r, BOTTOM);
-								set_fog_level(&c, fog_r);
+						face.squares[count++] = square;
 
-								square.colour = pack_colour_to_uint32(&c);
-								if (texture == water_texture) {
-									square.water = 1;
-								}
-
-								face.squares[count++] = square;
-
-								if (square_surrounds_centre_of_screen(&square)) {
-									highlight = 1;
-								}
-							}
+						if (square_surrounds_centre_of_screen(&square)) {
+							highlight = 1;
 						}
 					    break;
 					}
@@ -1407,32 +1411,25 @@ void render_chunks() {
 						float fog_r = sqrt((centre_x * centre_x) + (centre_z * centre_z));
 
 						int count = 0;
-						for (int i = 0; i < TEXTURE_WIDTH; i++) {
-							for (int j = 0; j < TEXTURE_WIDTH; j++) {
-								square_t square = {0};
+						square_t square = {0};
 
-								square.coords[0] = rotate_and_project((vec3_t) {x + (i * len), y - (j * len), z});
-								square.coords[1] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y - (j * len), z});
-								square.coords[2] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y - ((j + 1) * len), z});
-								square.coords[3] = rotate_and_project((vec3_t) {x + (i * len), y - ((j + 1) * len), z});
+						square.coords[0] = rotate_and_project((vec3_t) {x, y, z});
+						square.coords[1] = rotate_and_project((vec3_t) {x+ len, y, z});
+						square.coords[2] = rotate_and_project((vec3_t) {x+ len, y - len, z});
+						square.coords[3] = rotate_and_project((vec3_t) {x, y - len, z});
 
-								// 2, as the side face textures are the 2nd square of the texture image
-								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
+						// 2, as the side face textures are the 2nd square of the texture image
+						square.texture = side_texture(texture);
+						square.direction = FRONT;
+						square.fog = fog_r;
+						if (texture == water_texture) {
+							square.water = 1;
+						}
 
-								set_light_level(&c, fog_r, FRONT);
-								set_fog_level(&c, fog_r);
+						face.squares[count++] = square;
 
-								square.colour = pack_colour_to_uint32(&c);
-								if (texture == water_texture) {
-									square.water = 1;
-								}
-
-								face.squares[count++] = square;
-
-								if (square_surrounds_centre_of_screen(&square)) {
-									highlight = 1;
-								}
-							}
+						if (square_surrounds_centre_of_screen(&square)) {
+							highlight = 1;
 						}
 					    break;
 					}
@@ -1455,31 +1452,24 @@ void render_chunks() {
 						float fog_r = sqrt((centre_x * centre_x) + (centre_z * centre_z));
 
 						int count = 0;
-						for (int i = 0; i < TEXTURE_WIDTH; i++) {
-							for (int j = 0; j < TEXTURE_WIDTH; j++) {
-								square_t square = {0};
+						square_t square = {0};
 
-								square.coords[0] = rotate_and_project((vec3_t) {x + (i * len), y - (j * len), z});
-								square.coords[1] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y - (j * len), z});
-								square.coords[2] = rotate_and_project((vec3_t) {x + ((i + 1) * len), y - ((j + 1) * len), z});
-								square.coords[3] = rotate_and_project((vec3_t) {x + (i * len), y - ((j + 1) * len), z});
+						square.coords[0] = rotate_and_project((vec3_t) {x, y, z});
+						square.coords[1] = rotate_and_project((vec3_t) {x+ len, y, z});
+						square.coords[2] = rotate_and_project((vec3_t) {x+ len, y - len, z});
+						square.coords[3] = rotate_and_project((vec3_t) {x, y - len, z});
 
-								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
+						square.texture = side_texture(texture);
+						square.direction = BACK;
+						square.fog = fog_r;
+						if (texture == water_texture) {
+							square.water = 1;
+						}
 
-								set_light_level(&c, fog_r, BACK);
-								set_fog_level(&c, fog_r);
+						face.squares[count++] = square;
 
-								square.colour = pack_colour_to_uint32(&c);
-								if (texture == water_texture) {
-									square.water = 1;
-								}
-
-								face.squares[count++] = square;
-
-								if (square_surrounds_centre_of_screen(&square)) {
-									highlight = 1;
-								}
-							}
+						if (square_surrounds_centre_of_screen(&square)) {
+							highlight = 1;
 						}
 					    break;
 					}
@@ -1502,31 +1492,24 @@ void render_chunks() {
 						float fog_r = sqrt((centre_x * centre_x) + (centre_z * centre_z));
 
 						int count = 0;
-						for (int i = 0; i < TEXTURE_WIDTH; i++) {
-							for (int j = 0; j < TEXTURE_WIDTH; j++) {
-								square_t square = {0};
+						square_t square = {0};
 
-								square.coords[0] = rotate_and_project((vec3_t) {x, y - (j * len), z + (i * len)});
-								square.coords[1] = rotate_and_project((vec3_t) {x, y - (j * len), z + ((i + 1) * len)});
-								square.coords[2] = rotate_and_project((vec3_t) {x, y - ((j + 1) * len), z + ((i + 1) * len)});
-								square.coords[3] = rotate_and_project((vec3_t) {x, y - ((j + 1) * len), z + (i * len)});
+						square.coords[0] = rotate_and_project((vec3_t) {x, y, z});
+						square.coords[1] = rotate_and_project((vec3_t) {x, y, z+ len});
+						square.coords[2] = rotate_and_project((vec3_t) {x, y - len, z+ len});
+						square.coords[3] = rotate_and_project((vec3_t) {x, y - len, z});
 
-								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
+						square.texture = side_texture(texture);
+						square.direction = LEFT;
+						square.fog = fog_r;
+						if (texture == water_texture) {
+							square.water = 1;
+						}
 
-								set_light_level(&c, fog_r, LEFT);
-								set_fog_level(&c, fog_r);
-
-								square.colour = pack_colour_to_uint32(&c);
-								if (texture == water_texture) {
-									square.water = 1;
-								}
-
-								face.squares[count++] = square;
-								 
-								if (square_surrounds_centre_of_screen(&square)) {
-									highlight = 1;
-								}
-							}
+						face.squares[count++] = square;
+						 
+						if (square_surrounds_centre_of_screen(&square)) {
+							highlight = 1;
 						}
 					    break;
 					}
@@ -1549,31 +1532,24 @@ void render_chunks() {
 						float fog_r = sqrt((centre_x * centre_x) + (centre_z * centre_z));
 
 						int count = 0;
-						for (int i = 0; i < TEXTURE_WIDTH; i++) {
-							for (int j = 0; j < TEXTURE_WIDTH; j++) {
-								square_t square = {0};
+						square_t square = {0};
 
-								square.coords[0] = rotate_and_project((vec3_t) {x, y - (j * len), z + (i * len)});
-								square.coords[1] = rotate_and_project((vec3_t) {x, y - (j * len), z + ((i + 1) * len)});
-								square.coords[2] = rotate_and_project((vec3_t) {x, y - ((j + 1) * len), z + ((i + 1) * len)});
-								square.coords[3] = rotate_and_project((vec3_t) {x, y - ((j + 1) * len), z + (i * len)});
+						square.coords[0] = rotate_and_project((vec3_t) {x, y, z});
+						square.coords[1] = rotate_and_project((vec3_t) {x, y, z+ len});
+						square.coords[2] = rotate_and_project((vec3_t) {x, y - len, z+ len});
+						square.coords[3] = rotate_and_project((vec3_t) {x, y - len, z});
 
-								colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
+						square.texture = side_texture(texture);
+						square.direction = RIGHT;
+						square.fog = fog_r;
+						if (texture == water_texture) {
+							square.water = 1;
+						}
 
-								set_light_level(&c, fog_r, RIGHT);
-								set_fog_level(&c, fog_r);
+						face.squares[count++] = square;
 
-								square.colour = pack_colour_to_uint32(&c);
-								if (texture == water_texture) {
-									square.water = 1;
-								}
-
-								face.squares[count++] = square;
-
-								if (square_surrounds_centre_of_screen(&square)) {
-									highlight = 1;
-								}
-							}
+						if (square_surrounds_centre_of_screen(&square)) {
+							highlight = 1;
 						}
 					    break;
 					}
@@ -1603,34 +1579,20 @@ void render_chunks() {
 	// highlight cube
 	if (draw_highlight_index > -1) {
 		for (int k = 0; k < SQUARES_PER_FACE; k++) {
-			colour_t colour = unpack_colour_from_uint32(draw_faces.items[draw_highlight_index].squares[k].colour);
-			colour.r = (colour.r + 100);
-			if (colour.r < 100) {
-				colour.r = 255;
-			}
-			colour.g = (colour.g + 100);
-			if (colour.g < 100) {
-				colour.g = 255;
-			}
-			colour.b = (colour.b + 100);
-			if (colour.b < 100) {
-				colour.b = 255;
-			}
-			draw_faces.items[draw_highlight_index].squares[k].colour =  pack_colour_to_uint32(&colour);
+			draw_faces.items[draw_highlight_index].squares[k].highlight = 1;
 		}
 	}
 
 	// sort the faces based on their distance to the camera
-#ifndef OVERRIDE_TEXTURED_SQUARE
+//#ifndef OVERRIDE_TEXTURED_SQUARE
 	qsort(draw_faces.items, draw_faces.count, sizeof(face_t), compare_faces);
-#endif
+//#endif
 	return;
 }
 
 void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_pos, face_t *faces_array, int index) {
 
-	int len = CUBE_WIDTH / TEXTURE_WIDTH;
-	int texture_side = SQUARES_PER_FACE;
+	int len = CUBE_WIDTH;
 
 	// top left coord
 	int x1 = cube_top_left_front_pos.x;
@@ -1661,26 +1623,21 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 				centre_z = z + CUBE_WIDTH / 2;
 
 				int count = 0;
-				for (int i = 0; i < TEXTURE_WIDTH; i++) {
-					for (int j = 0; j < TEXTURE_WIDTH; j++) {
-						square_t square = {0};
+				square_t square = {0};
 
-						square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y, z + (j * len)}, x_rot, y_rot);
-						square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y, z + (j * len)}, x_rot, y_rot);
-						square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y, z + ((j + 1) * len)}, x_rot, y_rot);
-						square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y, z + ((j + 1) * len)}, x_rot, y_rot);
+				square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y, z}, x_rot, y_rot);
+				square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y, z}, x_rot, y_rot);
+				square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y, z + len}, x_rot, y_rot);
+				square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y, z + len}, x_rot, y_rot);
 
-						// 0 as that is the top texture
-						colour_t c = texture->pixels[j * TEXTURE_WIDTH + i];
-
-						square.colour = pack_colour_to_uint32(&c);
-						if (texture == water_texture) {
-							square.water = 1;
-						}
-
-						face.squares[count++] = square;
-					}
+				square.texture = top_texture(texture);
+				square.direction = TOP;
+				square.fog = 0.0f;
+				if (texture == water_texture) {
+					square.water = 1;
 				}
+
+				face.squares[count++] = square;
 				break;
 			}
 			case BOTTOM: {
@@ -1694,26 +1651,21 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 				centre_z = z + CUBE_WIDTH / 2;
 
 				int count = 0;
-				for (int i = 0; i < TEXTURE_WIDTH; i++) {
-					for (int j = 0; j < TEXTURE_WIDTH; j++) {
-						square_t square = {0};
+				square_t square = {0};
 
-						square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y, z + (j * len)}, x_rot, y_rot);
-						square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y, z + (j * len)}, x_rot, y_rot);
-						square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y, z + ((j + 1) * len)}, x_rot, y_rot);
-						square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y, z + ((j + 1) * len)}, x_rot, y_rot);
+				square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y, z}, x_rot, y_rot);
+				square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y, z}, x_rot, y_rot);
+				square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y, z + len}, x_rot, y_rot);
+				square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y, z + len}, x_rot, y_rot);
 
-						// 1, as the top face textures are the first square of the texture image
-						colour_t c = texture->pixels[1 * texture_side + j * TEXTURE_WIDTH + i];
-
-						square.colour = pack_colour_to_uint32(&c);
-						if (texture == water_texture) {
-							square.water = 1;
-						}
-
-						face.squares[count++] = square;
-					}
+				square.texture = bottom_texture(texture);
+				square.direction = BOTTOM;
+				square.fog = 0.0f;
+				if (texture == water_texture) {
+					square.water = 1;
 				}
+
+				face.squares[count++] = square;
 				break;
 			}
 			case FRONT: {
@@ -1727,26 +1679,21 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 				centre_z = z;
 
 				int count = 0;
-				for (int i = 0; i < TEXTURE_WIDTH; i++) {
-					for (int j = 0; j < TEXTURE_WIDTH; j++) {
-						square_t square = {0};
+				square_t square = {0};
 
-						square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y - (j * len), z}, x_rot, y_rot);
-						square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y - (j * len), z}, x_rot, y_rot);
-						square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y - ((j + 1) * len), z}, x_rot, y_rot);
-						square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y - ((j + 1) * len), z}, x_rot, y_rot);
+				square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y, z}, x_rot, y_rot);
+				square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y, z}, x_rot, y_rot);
+				square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y - len, z}, x_rot, y_rot);
+				square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y - len, z}, x_rot, y_rot);
 
-						// 2, as the side face textures are the 2nd square of the texture image
-						colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
-
-						square.colour = pack_colour_to_uint32(&c);
-						if (texture == water_texture) {
-							square.water = 1;
-						}
-
-						face.squares[count++] = square;
-					}
+				square.texture = side_texture(texture);
+				square.direction = FRONT;
+				square.fog = 0.0f;
+				if (texture == water_texture) {
+					square.water = 1;
 				}
+
+				face.squares[count++] = square;
 				break;
 			}
 			case BACK: {
@@ -1760,25 +1707,21 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 				centre_z = z;
 
 				int count = 0;
-				for (int i = 0; i < TEXTURE_WIDTH; i++) {
-					for (int j = 0; j < TEXTURE_WIDTH; j++) {
-						square_t square = {0};
+				square_t square = {0};
 
-						square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y - (j * len), z}, x_rot, y_rot);
-						square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y - (j * len), z}, x_rot, y_rot);
-						square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x + ((i + 1) * len), y - ((j + 1) * len), z}, x_rot, y_rot);
-						square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x + (i * len), y - ((j + 1) * len), z}, x_rot, y_rot);
+				square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y, z}, x_rot, y_rot);
+				square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y, z}, x_rot, y_rot);
+				square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x+ len, y - len, z}, x_rot, y_rot);
+				square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y - len, z}, x_rot, y_rot);
 
-						colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
-
-						square.colour = pack_colour_to_uint32(&c);
-						if (texture == water_texture) {
-							square.water = 1;
-						}
-
-						face.squares[count++] = square;
-					}
+				square.texture = side_texture(texture);
+				square.direction = BACK;
+				square.fog = 0.0f;
+				if (texture == water_texture) {
+					square.water = 1;
 				}
+
+				face.squares[count++] = square;
 				break;
 			}
 			case LEFT: {
@@ -1792,25 +1735,21 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 				centre_z = z + CUBE_WIDTH / 2;
 
 				int count = 0;
-				for (int i = 0; i < TEXTURE_WIDTH; i++) {
-					for (int j = 0; j < TEXTURE_WIDTH; j++) {
-						square_t square = {0};
+				square_t square = {0};
 
-						square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y - (j * len), z + (i * len)}, x_rot, y_rot);
-						square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x, y - (j * len), z + ((i + 1) * len)}, x_rot, y_rot);
-						square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x, y - ((j + 1) * len), z + ((i + 1) * len)}, x_rot, y_rot);
-						square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y - ((j + 1) * len), z + (i * len)}, x_rot, y_rot);
+				square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y, z}, x_rot, y_rot);
+				square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x, y, z+ len}, x_rot, y_rot);
+				square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x, y - len, z+ len}, x_rot, y_rot);
+				square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y - len, z}, x_rot, y_rot);
 
-						colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
-
-						square.colour = pack_colour_to_uint32(&c);
-						if (texture == water_texture) {
-							square.water = 1;
-						}
-
-						face.squares[count++] = square;
-					}
+				square.texture = side_texture(texture);
+				square.direction = LEFT;
+				square.fog = 0.0f;
+				if (texture == water_texture) {
+					square.water = 1;
 				}
+
+				face.squares[count++] = square;
 				break;
 			}
 			case RIGHT: {
@@ -1824,25 +1763,21 @@ void render_cube_to_faces_array(texture_t *texture, vec3_t cube_top_left_front_p
 				centre_z = z + CUBE_WIDTH / 2;
 
 				int count = 0;
-				for (int i = 0; i < TEXTURE_WIDTH; i++) {
-					for (int j = 0; j < TEXTURE_WIDTH; j++) {
-						square_t square = {0};
+				square_t square = {0};
 
-						square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y - (j * len), z + (i * len)}, x_rot, y_rot);
-						square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x, y - (j * len), z + ((i + 1) * len)}, x_rot, y_rot);
-						square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x, y - ((j + 1) * len), z + ((i + 1) * len)}, x_rot, y_rot);
-						square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y - ((j + 1) * len), z + (i * len)}, x_rot, y_rot);
+				square.coords[0] = rotate_and_project_by_rot_value((vec3_t) {x, y, z}, x_rot, y_rot);
+				square.coords[1] = rotate_and_project_by_rot_value((vec3_t) {x, y, z+ len}, x_rot, y_rot);
+				square.coords[2] = rotate_and_project_by_rot_value((vec3_t) {x, y - len, z+ len}, x_rot, y_rot);
+				square.coords[3] = rotate_and_project_by_rot_value((vec3_t) {x, y - len, z}, x_rot, y_rot);
 
-						colour_t c = texture->pixels[2 * texture_side + j * TEXTURE_WIDTH + i];
-
-						square.colour = pack_colour_to_uint32(&c);
-						if (texture == water_texture) {
-							square.water = 1;
-						}
-
-						face.squares[count++] = square;
-					}
+				square.texture = side_texture(texture);
+				square.direction = RIGHT;
+				square.fog = 0.0f;
+				if (texture == water_texture) {
+					square.water = 1;
 				}
+
+				face.squares[count++] = square;
 				break;
 			}
         }
@@ -2915,153 +2850,157 @@ void generate_easter_island_statue(vec3_t pos, int chunk_i) {
 }
 
 /* ------------------------------- textures ------------------------------- */
+static unsigned randu() { return (unsigned) (rand() & 0xFFFF); }
+static colour_t random_green_pixel() {
+	return (colour_t){ randu() % 10, randu() % 32 + 192, randu() % 20 };
+}
+static colour_t random_dark_green_pixel() {
+	return (colour_t){ randu() % 10, randu() % 64 + 64, randu() % 20 };
+}
+static colour_t random_brown_pixel() {
+	return (colour_t){ randu() % 64 + 64, randu() % 50 + 50, randu() % 10 };
+}
+static colour_t random_grey_pixel() {
+	return (colour_t){ randu() % 32 + 96, randu() % 32 + 96, randu() % 32 + 96 };
+}
+static colour_t random_yellow_pixel() {
+	return (colour_t){ randu() % 32 + 192, randu() % 32 + 192, randu() % 10 };
+}
+static colour_t random_blue_pixel() {
+	return (colour_t){ randu() % 10, randu() % 50 + 50, randu() % 32 + 192 };
+}
+static colour_t random_wood_top_pixel(int x, int y) {
+	int dist_from_center = abs(8-x) + abs(8-y);
+	colour_t a = random_yellow_pixel();
+	colour_t b = random_brown_pixel();
+	a.r = (int)lerp(a.r, b.r, dist_from_center / 15.0);
+	a.g = (int)lerp(a.g, b.g, dist_from_center / 15.0);
+	a.b = (int)lerp(a.b, b.b, dist_from_center / 15.0);
+	return a;
+}
+
+static texture_t *new_texture(int width, int height) {
+	texture_t *texture = malloc(sizeof(texture_t));
+    texture->pixels = malloc(width * height * sizeof(colour_t));
+	texture->width = width;
+	texture->height = height;
+	return texture;
+}
+
 void generate_textures() {
-	// create grass texture
-	// * 3 for top bottom side of cube
-    int width = TEXTURE_WIDTH * 3;
-    int height = TEXTURE_WIDTH;
-	grass_texture = malloc(sizeof(texture_t));
-    grass_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	grass_texture->width = width;
-	grass_texture->height = height;
-
-	// top
-	int i = 0;
-	for (; i < SQUARES_PER_FACE; i++) {
-		grass_texture->pixels[i] = (colour_t){10, 180 + (rand() % 70), 20 + (rand() % 60)};
-	}
-	// bottom
-	for (; i < 2 * SQUARES_PER_FACE; i++) {
-		grass_texture->pixels[i] = (colour_t){150 + (rand() % 70), 75 + (rand() % 60), 10 + (rand() % 60)};
-	}
-	// side
-	for (; i < 3 * SQUARES_PER_FACE; i++) {
-		if (i < 2.5 * SQUARES_PER_FACE) {
-			grass_texture->pixels[i] = (colour_t){10, 180 + (rand() % 70), 20 + (rand() % 60)};
-		}
-		else {
-			grass_texture->pixels[i] = (colour_t){150 + (rand() % 70), 75 + (rand() % 60), 10 + (rand() % 60)};
+	rect_texture = new_texture(1, 1);
+	rect_texture->pixels[0] = (colour_t){ 255, 255, 255 };
+	
+    int width = 16;
+    int height = 16;
+	
+	grass_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			if (y < 5) {
+				grass_texture->pixels[y * width + x] = random_green_pixel();
+			} else if (y >= 7) {
+				grass_texture->pixels[y * width + x] = random_brown_pixel();
+			} else if (rand() % 2 == 0) {
+				grass_texture->pixels[y * width + x] = random_green_pixel();
+			} else {
+				grass_texture->pixels[y * width + x] = random_brown_pixel();
+			}
 		}
 	}
-
-	// create stone texture
-	// top bottom side
-	stone_texture = malloc(sizeof(texture_t));
-    stone_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	stone_texture->width = width;
-	stone_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		stone_texture->pixels[i] = (colour_t){110 + (rand()  % 20), 110 + (rand()  % 20), 120 + (rand()  % 20)};
+	
+	// top texture
+	grass_top_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			grass_top_texture->pixels[y * width + x] = random_green_pixel();
+		}
 	}
-
-	// create dirt texture
-	// top bottom side
-	dirt_texture = malloc(sizeof(texture_t));
-    dirt_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	dirt_texture->width = width;
-	dirt_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		dirt_texture->pixels[i] = (colour_t){150 + (rand() % 70), 75 + (rand() % 60), 10 + (rand() % 60)};
+	
+	// dirt texture
+	dirt_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			dirt_texture->pixels[y * width + x] = random_brown_pixel();
+		}
 	}
-
-	// create wood texture
-	// * 3 for top bottom side of cube
-	// top
-	wood_texture = malloc(sizeof(texture_t));
-    wood_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	wood_texture->width = width;
-	wood_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE; i++) {
-		wood_texture->pixels[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50)};
+	
+	// stone texture
+	stone_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			stone_texture->pixels[y * width + x] = random_grey_pixel();
+		}
 	}
-	// bottom
-	for (; i < 2 * SQUARES_PER_FACE; i++) {
-		wood_texture->pixels[i] = (colour_t){200 + (rand() % 50), 180 + (rand() % 50), 150 + (rand() % 50)};
+	
+	// wood texture
+	wood_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			if (y == 0 || rand() % 3 == 0) {
+				wood_texture->pixels[y * width + x] = random_brown_pixel();
+			}
+			else {
+				wood_texture->pixels[y * width + x] = wood_texture->pixels[(y - 1) * width + x];
+			}
+		}
 	}
-	// side
-	for (; i < 3 * SQUARES_PER_FACE; i++) {
-		wood_texture->pixels[i] = (colour_t){ 110 + (rand() % 7),  70 + (rand() % 15),  40 + (rand() % 10)};
+	
+	// wood top texture
+	wood_top_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			wood_top_texture->pixels[y * width + x] = random_wood_top_pixel(x, y);
+		}
 	}
-
-	// create leaf texture
-	// top bottom side
-	leaf_texture = malloc(sizeof(texture_t));
-    leaf_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	leaf_texture->width = width;
-	leaf_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		leaf_texture->pixels[i] = (colour_t){5 - (rand()  % 5), 95 - (rand()  % 40), 7 - (rand()  % 7)};
+	
+	// leaf texture
+	leaf_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			leaf_texture->pixels[y * width + x] = random_dark_green_pixel();
+		}
 	}
-
-	// create sand texture
-	// top bottom side
-	sand_texture = malloc(sizeof(texture_t));
-    sand_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	sand_texture->width = width;
-	sand_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		sand_texture->pixels[i] = (colour_t){240 - (rand()  % 5), 190 - (rand()  % 40), 80 - (rand()  % 7)};
+	
+	// sand texture
+	sand_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			sand_texture->pixels[y * width + x] = random_yellow_pixel();
+		}
 	}
-
-	// create water texture
-	// top bottom side
-	water_texture = malloc(sizeof(texture_t));
-    water_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	water_texture->width = width;
-	water_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		water_texture->pixels[i] = (colour_t){50 + (rand() % 50), 50 + (rand() % 50), 255};
+	
+	// water texture
+	water_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			water_texture->pixels[y * width + x] = random_blue_pixel();
+		}
 	}
-
-	// create black texture
-	// top bottom side
-	black_texture = malloc(sizeof(texture_t));
-    black_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	black_texture->width = width;
-	black_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		black_texture->pixels[i] = (colour_t){30 + (rand()  % 20), 30 + (rand()  % 20), 30 + (rand()  % 20)};
+	
+	// black texture
+	black_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			black_texture->pixels[y * width + x] = (colour_t){ 10, 10, 10 };
+		}
 	}
-
-	// create white texture
-	// top bottom side
-	white_texture = malloc(sizeof(texture_t));
-    white_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	white_texture->width = width;
-	white_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		white_texture->pixels[i] = (colour_t){220 + (rand()  % 20), 220 + (rand()  % 20), 220 + (rand()  % 20)};
+	
+	// white texture
+	white_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			white_texture->pixels[y * width + x] = (colour_t){ 250, 250, 250 };
+		}
 	}
-
-	// create beige texture
-	// top bottom side
-	beige_texture = malloc(sizeof(texture_t));
-    beige_texture->pixels = malloc(width * height * 3 * sizeof(colour_t));
-	beige_texture->width = width;
-	beige_texture->height = height;
-
-	i = 0;
-	for (; i < SQUARES_PER_FACE * 3; i++) {
-		beige_texture->pixels[i] = (colour_t){200 + (rand()  % 20), 150 + (rand()  % 20), 120 + (rand()  % 20)};
+	
+	// beige texture
+	beige_texture = new_texture(width, height);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			beige_texture->pixels[y * width + x] = (colour_t){ 237, 232, 208 };
+		}
 	}
-
-	return;
 }
 
 // gpt perlin:
@@ -3150,8 +3089,6 @@ void Update(int deltaTime)
 	update();
 }
 
-//static float pDepthBuffer[WIDTH * HEIGHT];
-
 void Render(int deltaTime)
 {
 	(void) deltaTime;
@@ -3161,15 +3098,7 @@ void Render(int deltaTime)
 	i.framebuffer = (const uint32_t *)pixels;
 	//VidBlitImage(&i, 0, 0);
 	
-	//for (int i=0; i<WIDTH*HEIGHT; i++){
-	//	float v=pDepthBuffer[i];
-	//	if(v<0)v=0;
-	//	if(v>1)v=1;
-	//	uint8_t b= 255*v;
-	//	pixels[i]=b|(b<<8)|(b<<16);
-	//}
-	
-	VidBlitImageResize(&i, 0, 0, WIDTH * 2, HEIGHT * 2);
+	VidBlitImageResize(&i, 0, 0, WIDTH * SCALE, HEIGHT * SCALE);
 }
 
 void OnSize(int width, int height)
@@ -3205,6 +3134,7 @@ void Init()
 int mouseX, mouseY;
 bool mouseL, mouseR, setPause;
 extern bool gKeyboardState[128];
+bool lastDBEKey = false;
 
 void UpdateKeyStates()
 {
@@ -3234,55 +3164,31 @@ const char* GetGameName() {
 
 #endif
 
-// TODO: only works on nanoshell atm
-#ifdef OVERRIDE_TEXTURED_SQUARE
+#include "textured_quad.h"
 
-#include "textured_triangle.h"
-#include "bricks.h"
-#include "crate.h"
-
-/*
-typedef struct {
-	int x;
-	int y;
-	int z;	
-} vec3_t;
-
-typedef struct {
-	vec3_t coords[4];	
-	uint32_t colour;
-	int water;
-} square_t;
-*/
-
-#define CRDS(square, idx) ((square)->coords[(idx)].x), ((square)->coords[(idx)].y)
-#define Z(square, idx) ((square)->coords[(idx)].z)
-
-float coeff_here = 1000.0f;
-
-static float safe_z_to_w(int z)
-{
-	if (z == 0)
-		return 1.0f;
-	return coeff_here / (float) z;
+static float brightness_from_side(int side) {
+	switch (side) {
+		case TOP:    return 1.0f;
+		case BOTTOM: return 0.5f;
+		case LEFT:
+		case RIGHT:  return 0.8f;
+		default:
+		case FRONT:
+		case BACK:   return 0.6f;
+	}
 }
 
-void SLogMsg(const char*,...);
 void fill_square_textured(square_t *square)
 {
-	textured_triangle(
-		CRDS(square, 0), 0.0f, 0.0f, safe_z_to_w(Z(square, 0)),
-		CRDS(square, 1), 0.0f, 1.0f, safe_z_to_w(Z(square, 1)),
-		CRDS(square, 2), 1.0f, 1.0f, safe_z_to_w(Z(square, 2)),
-		&g_bricks_icon
-	);
-	textured_triangle(
-		CRDS(square, 0), 0.0f, 0.0f, safe_z_to_w(Z(square, 0)),
-		CRDS(square, 2), 1.0f, 1.0f, safe_z_to_w(Z(square, 2)),
-		CRDS(square, 3), 1.0f, 0.0f, safe_z_to_w(Z(square, 3)),
-		&g_crate_icon
+	textured_quad(
+		square->coords,
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
+		square->texture,
+		brightness_from_side(square->direction),
+		square->fog,
+		square->water
 	);
 }
-
-#endif
-

@@ -58,7 +58,7 @@ static void draw_pixel(int x, int y, uint32_t col)
 	pixels[y * WIDTH + x] = col;
 }
 
-static float pDepthBuffer[WIDTH * HEIGHT];
+//static float pDepthBuffer[WIDTH * HEIGHT];
 
 void clear_depth_buffer()
 {

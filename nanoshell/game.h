@@ -31,7 +31,11 @@ float cos(float x);
 double sqrt(double x);
 double Abs(double x);
 double Trim(double x);
-double floor(double x);
+
+int floor(float x);
+int ceil(float x);
+float fmin(float a, float b);
+float fmax(float a, float b);
 
 double fmod(double x, double y);
 double atan2l(double y, double x);
